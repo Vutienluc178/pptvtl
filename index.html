@@ -765,9 +765,9 @@ D. sinA / a = 2R
                             <div>
                                 <div class="flex justify-between items-center mb-1">
                                     <label class="text-xs font-medium text-gray-600">Tiêu đề <code class="bg-gray-100 px-1 rounded text-pink-500 text-xs">#</code></label>
-                                    <span class="text-sm font-bold text-indigo-600" id="titleSizeLabel">40pt</span>
+                                    <span class="text-sm font-bold text-indigo-600" id="titleSizeLabel">26pt</span>
                                 </div>
-                                <input type="range" class="fs-slider" id="titleSizeSlider" min="24" max="54" step="2" value="40" oninput="onFsSlidersChange()">
+                                <input type="range" class="fs-slider" id="titleSizeSlider" min="16" max="40" step="2" value="26" oninput="onFsSlidersChange()">
                                 <div class="flex justify-between text-xs text-gray-300 mt-0.5"><span>24pt</span><span>54pt</span></div>
                             </div>
                             <div>
@@ -781,9 +781,9 @@ D. sinA / a = 2R
                             <div>
                                 <div class="flex justify-between items-center mb-1">
                                     <label class="text-xs font-medium text-gray-600">Nội dung <code class="bg-gray-100 px-1 rounded text-pink-500 text-xs">-</code> dòng</label>
-                                    <span class="text-sm font-bold text-indigo-600" id="bodySizeLabel">28pt</span>
+                                    <span class="text-sm font-bold text-indigo-600" id="bodySizeLabel">22pt</span>
                                 </div>
-                                <input type="range" class="fs-slider" id="bodySizeSlider" min="14" max="34" step="2" value="28" oninput="onFsSlidersChange()">
+                                <input type="range" class="fs-slider" id="bodySizeSlider" min="12" max="30" step="2" value="22" oninput="onFsSlidersChange()">
                                 <div class="flex justify-between text-xs text-gray-300 mt-0.5"><span>14pt</span><span>34pt</span></div>
                             </div>
                         </div>
@@ -1065,11 +1065,11 @@ D. sinA / a = 2R
         var currentFsMode = 'auto';
 
         var FS_PRESETS = {
-            auto:   { title:40, subtitle:26, body:28, table:20, maxLines:'4–5',  desc:'Tối ưu cho 4–5 dòng nội dung mỗi slide'   },
-            large:  { title:44, subtitle:30, body:30, table:22, maxLines:'1–3',  desc:'Tối ưu cho 1–3 dòng nội dung mỗi slide'   },
-            medium: { title:40, subtitle:26, body:26, table:20, maxLines:'4–5',  desc:'Tối ưu cho 4–5 dòng nội dung mỗi slide'   },
-            small:  { title:34, subtitle:22, body:22, table:18, maxLines:'6–7',  desc:'Tối ưu cho 6–7 dòng nội dung mỗi slide'   },
-            custom: { title:40, subtitle:26, body:28, table:20, maxLines:'—',    desc:'Kích thước do bạn tùy chỉnh'               },
+            auto:   { title:26, subtitle:24, body:22, table:16, maxLines:'4–5',  desc:'Tối ưu cho 4–5 dòng nội dung mỗi slide'   },
+            large:  { title:30, subtitle:26, body:26, table:18, maxLines:'1–3',  desc:'Tối ưu cho 1–3 dòng nội dung mỗi slide'   },
+            medium: { title:26, subtitle:24, body:22, table:16, maxLines:'4–5',  desc:'Tối ưu cho 4–5 dòng nội dung mỗi slide'   },
+            small:  { title:24, subtitle:20, body:18, table:14, maxLines:'6–7',  desc:'Tối ưu cho 6–7 dòng nội dung mỗi slide'   },
+            custom: { title:26, subtitle:24, body:22, table:16, maxLines:'—',    desc:'Kích thước do bạn tùy chỉnh'               },
         };
 
         // =====================================================
@@ -1173,7 +1173,7 @@ D. sinA / a = 2R
             const textarea = activeTab === 'basic' || activeTab === 'preview'
                 ? document.getElementById('markdownInput')
                 : document.getElementById('quizInput');
-            const text = textarea.value.trim();
+            const text = normalizeMarkdownInput(textarea.value.trim());
             if (!text) { document.getElementById('slideCounter').textContent = '0 slide'; return; }
             const count = text.split(/^---$/m).filter(s => s.trim() !== '').length;
             document.getElementById('slideCounter').textContent = count + ' slide';
@@ -1188,6 +1188,81 @@ D. sinA / a = 2R
             return tableLines
                 .filter(l => !/^\|[\s\|\-:]+\|?\s*$/.test(l)) // bỏ dòng |---|---|
                 .map(l => l.trim().replace(/^\||\|$/g,'').split('|').map(c => c.trim()));
+        }
+
+        // =====================================================
+        // NORMALIZER — chuyển đổi định dạng Markdown mở rộng
+        // sang định dạng chuẩn --- trước khi xử lý
+        // =====================================================
+        /**
+         * Phát hiện và chuẩn hóa các định dạng Markdown đầu vào khác nhau:
+         *   • ## Slide N: Tiêu đề  →  # Tiêu đề  (tách slide bằng ---)
+         *   • * bullet / 1. num    →  - bullet
+         *   • **bold** / *italic*  →  plain text
+         *   • dòng **CHỈ TOÀN BOLD** → ## Subtitle
+         *
+         * Nếu không phát hiện định dạng đặc biệt, trả về nguyên bản.
+         */
+        function normalizeMarkdownInput(raw) {
+            // ── Kiểm tra có phải định dạng "## Slide N:" không ──
+            if (!/^##\s+Slide\s+\d+/im.test(raw)) return raw;
+
+            const lines = raw.split('\n');
+            const slideBlocks = [];
+            let cur = null;
+
+            lines.forEach(line => {
+                // Dòng bắt đầu slide mới: ## Slide 3: Tiêu đề
+                const m = line.match(/^##\s+Slide\s+\d+[:.：\s]*(.*)$/i);
+                if (m) {
+                    if (cur !== null) slideBlocks.push(cur);
+                    const rawTitle = m[1].trim()
+                        .replace(/\*\*(.*?)\*\*/g, '$1')
+                        .replace(/\*(.*?)\*/g, '$1');
+                    cur = rawTitle ? `# ${rawTitle}\n` : '';
+                } else if (cur !== null) {
+                    cur += line + '\n';
+                }
+            });
+            if (cur !== null) slideBlocks.push(cur);
+
+            // ── Chuẩn hóa từng block slide ──
+            function normalizeBlock(block) {
+                return block.split('\n').map(line => {
+                    const t = line.trim();
+                    if (!t) return '';
+
+                    // Dòng chỉ toàn **BOLD** → subtitle ##
+                    if (/^\*\*((?!\*).+)\*\*$/.test(t)) {
+                        return '## ' + t.replace(/^\*\*|\*\*$/g, '');
+                    }
+
+                    // * bullet (mọi cấp thụt đầu → làm phẳng thành -)
+                    const bm = line.match(/^[ \t]*\*\s+(.+)$/);
+                    if (bm) {
+                        const txt = bm[1]
+                            .replace(/\*\*(.*?)\*\*/g, '$1')
+                            .replace(/\*(.*?)\*/g, '$1');
+                        return '- ' + txt;
+                    }
+
+                    // Danh sách đánh số: 1. 2. 3. → -
+                    const nm = line.match(/^[ \t]*\d+\.\s+(.+)$/);
+                    if (nm) {
+                        const txt = nm[1]
+                            .replace(/\*\*(.*?)\*\*/g, '$1')
+                            .replace(/\*(.*?)\*/g, '$1');
+                        return '- ' + txt;
+                    }
+
+                    // Dòng thường — bỏ **bold** và *italic*
+                    return line
+                        .replace(/\*\*(.*?)\*\*/g, '$1')
+                        .replace(/\*(.*?)\*/g, '$1');
+                }).join('\n');
+            }
+
+            return slideBlocks.map(normalizeBlock).join('\n---\n');
         }
 
         /**
@@ -1317,7 +1392,7 @@ D. sinA / a = 2R
                 return;
             }
 
-            const slidesData = rawText.split(/^---$/m).filter(s => s.trim() !== '');
+            const slidesData = normalizeMarkdownInput(rawText).split(/^---$/m).filter(s => s.trim() !== '');
             const total = slidesData.length;
             let html = '';
 
@@ -2328,11 +2403,12 @@ D. sinA / a = 2R
             const USABLE_H   = FOOTER_Y - BOTTOM_PAD;              // ~7.02"
 
             const isLongTitle = titleText.length > 45;
-            const titleY      = 0.05;                                  // sát mép trên
-            const titleSize   = 32;                                    // tiêu đề 32pt
-            const titleH      = isLongTitle   ? 0.55 : 0.38;          // 1/2 so với trước
+            const titleY      = 0.20;                                  // cách mép trên ~5mm
+            const titleSize   = 26;                                    // tiêu đề 26pt
+            const titleH      = isLongTitle   ? 0.55 : 0.40;          // chiều cao vùng tiêu đề
+            const GAP_TITLE   = 0.14;                                  // khoảng trắng sau tiêu đề
             const subtitleH   = subtitleText  ? 0.30 : 0;
-            const bodyStartY  = titleY + titleH + subtitleH;
+            const bodyStartY  = titleY + titleH + GAP_TITLE + subtitleH;
             const availH      = USABLE_H - bodyStartY;
 
             // Separate content
@@ -2348,15 +2424,15 @@ D. sinA / a = 2R
                 return {
                     titleSize, startBodyY: bodyStartY,
                     subtitleSize: 24,
-                    bodySize: 28, tableSize: 20, lineSpacing: 0,
-                    lineH: Math.max(0.30, 28 * 0.0210), titleY,
+                    bodySize: 22, tableSize: 16, lineSpacing: 0,
+                    lineH: Math.max(0.30, 22 * 0.0210), titleY,
                 };
             }
 
-            // Ưu tiên 28pt; chỉ giảm nếu nội dung quá nhiều
+            // Ưu tiên 22pt; chỉ giảm nếu nội dung quá nhiều
             const fsCandidates = isSpaceSaving
-                ? [28, 26, 24, 22, 20, 18, 16]
-                : [28, 26, 24, 22, 20, 18, 16];
+                ? [22, 20, 18, 16]
+                : [22, 20, 18, 16];
 
             let chosen = { bodySize: 16, lineH: 0.34 };
             for (const fs of fsCandidates) {
@@ -2372,7 +2448,7 @@ D. sinA / a = 2R
                 titleSize,
                 subtitleSize: 24,
                 bodySize:    chosen.bodySize,
-                tableSize:   Math.max(14, chosen.bodySize - 8),
+                tableSize:   Math.max(12, chosen.bodySize - 6),
                 lineSpacing: 0,                                        // không gap giữa bullets
                 lineH:       chosen.lineH,                             // chiều cao 1 dòng thực
                 titleY,
@@ -2388,23 +2464,24 @@ D. sinA / a = 2R
                 return computeSmartSizes(titleText, subtitleText, bodyBlocks, isSpaceSaving);
             }
 
-            // Shared geometry — titleY sát mép trên, header nhỏ gọn
+            // Shared geometry — titleY cách mép trên ~5mm, có gap sau tiêu đề
             const isLongTitle = titleText.length > 45;
-            const titleY      = 0.05;
-            const titleSize   = 28;
-            const titleH      = isLongTitle ? 0.55 : 0.38;
+            const titleY      = 0.20;
+            const titleSize   = 26;
+            const titleH      = isLongTitle ? 0.55 : 0.40;
+            const GAP_TITLE   = 0.14;
             const subtitleH   = subtitleText ? 0.30 : 0;
-            const startBodyY  = titleY + titleH + subtitleH;
+            const startBodyY  = titleY + titleH + GAP_TITLE + subtitleH;
 
             if (mode === 'custom') {
-                const bs = parseInt(document.getElementById('bodySizeSlider').value)  || 28;
+                const bs = parseInt(document.getElementById('bodySizeSlider').value)  || 22;
                 const ss = parseInt(document.getElementById('subSizeSlider').value)   || 24;
                 const lh = Math.max(0.30, bs * 0.0210);
                 return {
-                    titleSize: 32,
+                    titleSize: 26,
                     subtitleSize: ss,
                     bodySize:    bs,
-                    tableSize:   Math.max(14, bs - 6),
+                    tableSize:   Math.max(12, bs - 6),
                     lineSpacing: 0,
                     lineH:       lh,
                     titleY, startBodyY,
@@ -2416,10 +2493,10 @@ D. sinA / a = 2R
             const bScale = isSpaceSaving ? -2 : 0;
             const bs = p.body + bScale;
             return {
-                titleSize: 32,
+                titleSize: 26,
                 subtitleSize: 24,
                 bodySize:    bs,
-                tableSize:   Math.max(14, bs - 6),
+                tableSize:   Math.max(12, bs - 6),
                 lineSpacing: 0,
                 lineH:       Math.max(0.30, bs * 0.0210),
                 titleY, startBodyY,
@@ -2563,7 +2640,7 @@ D. sinA / a = 2R
                     ]
                 });
 
-                const slidesData = rawTextFinal.split(/^---$/m);
+                const slidesData = normalizeMarkdownInput(rawTextFinal).split(/^---$/m);
                 let slideNum = 0;
 
                 slidesData.forEach(slideContent => {
@@ -2736,19 +2813,19 @@ D. sinA / a = 2R
                             // Tiêu đề (full-width phía trên cả 2 cột)
                             if (titleText) {
                                 slide.addText(titleText, {
-                                    x: TX, y: 0.05, w: 9.4, h: 0.38,
-                                    fontFace: 'Arial', fontSize: 32,
+                                    x: TX, y: 0.20, w: 9.4, h: 0.40,
+                                    fontFace: 'Arial', fontSize: 26,
                                     color: h(T.title), bold: true, valign: 'top',
                                     paraSpaceBefore: 0, paraSpaceAfter: 0,
                                 });
                             }
 
                             // Subtitle
-                            let textStartY = titleText ? 0.48 : 0.15;
+                            let textStartY = titleText ? 0.74 : 0.22;
                             if (subtitleText) {
                                 slide.addText(subtitleText, {
                                     x: TX, y: textStartY, w: TW, h: 0.50,
-                                    fontFace: 'Arial', fontSize: 22,
+                                    fontFace: 'Arial', fontSize: 24,
                                     color: h(T.text), italic: true, valign: 'top',
                                     paraSpaceBefore: 0, paraSpaceAfter: 0,
                                 });
@@ -2756,17 +2833,17 @@ D. sinA / a = 2R
                             }
 
                             // Bullets trong cột trái
-                            // Wrap tính theo half-width ~4.5" thực dụng tại 28pt Arial
-                            // trung bình 0.155"/ký tự → 4.5/0.155 ≈ 29, dùng 30 để an toàn
-                            const splitLineH = Math.max(0.30, 28 * 0.0210);
-                            const CHARS_PER_LINE_HALF = 30; // ký tự/dòng tại w=4.8", fs=28pt
+                            // Wrap tính theo half-width ~4.5" thực dụng tại 22pt Arial
+                            // trung bình 0.155" * (22/28) ≈ 0.122"/ký tự → 4.5/0.122 ≈ 37
+                            const splitLineH = Math.max(0.30, 22 * 0.0210);
+                            const CHARS_PER_LINE_HALF = 37; // ký tự/dòng tại w=4.8", fs=22pt
                             bodyBlocks.forEach(block => {
                                 if (block.type === 'bullet') {
                                     const lineCount = Math.max(1, Math.ceil(block.text.length / CHARS_PER_LINE_HALF));
                                     const bh = lineCount * splitLineH;
                                     slide.addText(block.text, {
                                         x: TX, y: textStartY, w: TW, h: bh,
-                                        fontFace: 'Arial', fontSize: 28,
+                                        fontFace: 'Arial', fontSize: 22,
                                         color: h(T.text),
                                         bullet: { type: 'bullet' }, valign: 'top',
                                         paraSpaceBefore: 0, paraSpaceAfter: 0,
@@ -2837,7 +2914,7 @@ D. sinA / a = 2R
                             const contentX = isSpaceSaving ? 0.3  : 0.5;
                             const tableW   = isSpaceSaving ? 9.4  : 9.0;
                             const contentW = isSpaceSaving ? 9.4  : 9.0;
-                            const titleH   = isLongTitle   ? 0.55 : 0.38;  // nhỏ gọn 1/2
+                            const titleH   = isLongTitle   ? 0.55 : 0.40;
 
                             let startY = sz.startBodyY;
 
