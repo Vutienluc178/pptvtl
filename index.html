@@ -522,7 +522,7 @@ D. sinA / a = 2R
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Tên tác giả / Footer</label>
-                            <input type="text" id="footerInput" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm font-medium" value="Vũ Tiến Lực NHC - 0969068849">
+                            <input type="text" id="footerInput" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm font-medium" value="Thầy Vũ Tiến Lực NHC >
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Font Footer</label>
@@ -582,6 +582,16 @@ D. sinA / a = 2R
                             <input type="radio" name="themeMode" value="pink" class="text-indigo-600 w-3.5 h-3.5">
                             <span class="text-sm text-gray-800">Hồng năng động</span>
                             <div class="ml-auto w-4 h-4 rounded border border-pink-300 bg-pink-50 flex-shrink-0"></div>
+                        </label>
+
+                        <label class="flex items-center gap-3 p-2.5 border-2 border-amber-300 rounded-lg cursor-pointer hover:bg-amber-50 transition" onclick="updateThemeBadge('VTL Math')">
+                            <input type="radio" name="themeMode" value="vtl" class="text-indigo-600 w-3.5 h-3.5">
+                            <span class="text-sm font-semibold" style="color:#1B3B77;">✦ VTL Math Brand</span>
+                            <div class="ml-auto flex items-center gap-1">
+                                <div class="w-3 h-3 rounded-full flex-shrink-0" style="background:#1B3B77;"></div>
+                                <div class="w-3 h-3 rounded-full flex-shrink-0" style="background:#C5922C;"></div>
+                                <div class="w-3 h-3 rounded-full flex-shrink-0" style="background:#F0F5FF; border:1px solid #A8C4E8;"></div>
+                            </div>
                         </label>
 
                         <!-- ── Custom color picker ── -->
@@ -1029,6 +1039,7 @@ D. sinA / a = 2R
             paper: { bg:"#FDFBF7", footerBg:"#F3EFE6", footerText:"#8B7355", title:"#8B5A2B", text:"#4A4A4A", badgeBg:"#D2B48C", badgeText:"#FFFFFF", solBg:"#F3EFE6", solText:"#5C3D11", solBorder:"#C4A265" },
             blue:  { bg:"#F0F9FF", footerBg:"#E0F2FE", footerText:"#0284C7", title:"#0369A1", text:"#0F172A", badgeBg:"#0EA5E9", badgeText:"#FFFFFF", solBg:"#E0F2FE", solText:"#0369A1", solBorder:"#38BDF8" },
             pink:  { bg:"#FDF2F8", footerBg:"#FCE7F3", footerText:"#DB2777", title:"#BE185D", text:"#4A044E", badgeBg:"#E11D48", badgeText:"#FFFFFF", solBg:"#FCE7F3", solText:"#831843", solBorder:"#F472B6" },
+            vtl:   { bg:"#F0F5FF", footerBg:"#1B3B77", footerText:"#A8C4E8", title:"#1B3B77", text:"#1E293B", badgeBg:"#C5922C", badgeText:"#FFFFFF", solBg:"#E3ECFF", solText:"#1B3B77", solBorder:"#C5922C" },
             custom:{ bg:"#FFFFFF", footerBg:"#F3F4F6", footerText:"#9CA3AF", title:"#1E3A8A", text:"#374151", badgeBg:"#4F46E5", badgeText:"#FFFFFF", solBg:"#E8F5E9", solText:"#1B5E20", solBorder:"#4CAF50" }
         };
 
@@ -1543,7 +1554,7 @@ D. sinA / a = 2R
                 if (d.theme) {
                     const radio = document.querySelector(`input[name="themeMode"][value="${d.theme}"]`);
                     if (radio) { radio.checked = true; }
-                    const names = {light:'Trắng',dark:'Tối',brand:'Hoàng Gia',paper:'Giấy',blue:'Xanh',pink:'Hồng',custom:'Tùy chỉnh'};
+                    const names = {light:'Trắng',dark:'Tối',brand:'Hoàng Gia',paper:'Giấy',blue:'Xanh',pink:'Hồng',vtl:'VTL Math',custom:'Tùy chỉnh'};
                     updateThemeBadge(names[d.theme] || d.theme);
                 }
                 updateSlideCounter();
@@ -2224,10 +2235,10 @@ D. sinA / a = 2R
         // ── Core smart-sizing algorithm ────────────────────────
         // Phân tích nội dung slide → trả về các cỡ chữ tối ưu
         function computeSmartSizes(titleText, subtitleText, bodyBlocks, isSpaceSaving) {
-            // PPTX canvas: 10" × 7.5"  — footer 10% = 0.75"
-            const FOOTER_Y   = 6.75; // top of footer
-            const BOTTOM_PAD = 0.15;
-            const USABLE_H   = FOOTER_Y - BOTTOM_PAD;              // 6.6"
+            // PPTX canvas: 10" × 7.5"  — footer 5% = 0.375"
+            const FOOTER_Y   = 7.125; // top of footer (95% × 7.5")
+            const BOTTOM_PAD = 0.10;
+            const USABLE_H   = FOOTER_Y - BOTTOM_PAD;              // ~7.02"
 
             const isLongTitle = titleText.length > 45;
             const titleY      = 0.05;                                  // sát mép trên
@@ -2370,16 +2381,32 @@ D. sinA / a = 2R
                 // =====================================================
                 // DEFINE SLIDE MASTER + SỐ TRANG (placeholder slidenum)
                 // =====================================================
+                // VTL — watermark ký hiệu toán học chìm nền
+                const vtlWatermarks = selectedTheme === 'vtl' ? [
+                    // ── Ký hiệu lớn, chìm, rải đều — màu D4E2F7 trên nền F0F5FF ──
+                    { text: { text: '∑', options: { x: 0.10, y: 0.38, w: 1.50, h: 1.50, fontFace:'Arial', fontSize: 92, color:'ECF1FB', align:'center', valign:'middle' } } },
+                    { text: { text: '∫', options: { x: 7.90, y: 0.90, w: 1.00, h: 1.70, fontFace:'Arial', fontSize:108, color:'ECF1FB', align:'center', valign:'middle' } } },
+                    { text: { text: 'π', options: { x: 1.10, y: 4.10, w: 1.10, h: 1.10, fontFace:'Arial', fontSize: 84, color:'ECF1FB', align:'center', valign:'middle' } } },
+                    { text: { text: '√̄', options: { x: 8.30, y: 3.90, w: 1.20, h: 1.00, fontFace:'Arial', fontSize: 86, color:'ECF1FB', align:'center', valign:'middle' } } },
+                    { text: { text: '∞', options: { x: 4.30, y: 5.00, w: 1.60, h: 0.90, fontFace:'Arial', fontSize: 70, color:'ECF1FB', align:'center', valign:'middle' } } },
+                    { text: { text: '±', options: { x: 0.30, y: 5.50, w: 0.90, h: 0.90, fontFace:'Arial', fontSize: 56, color:'ECF1FB', align:'center', valign:'middle' } } },
+                    { text: { text: '∇', options: { x: 6.50, y: 0.10, w: 1.00, h: 1.00, fontFace:'Arial', fontSize: 66, color:'ECF1FB', align:'center', valign:'middle' } } },
+                    { text: { text: 'Δ', options: { x: 3.20, y: 2.80, w: 1.00, h: 1.00, fontFace:'Arial', fontSize: 48, color:'EDF2FC', align:'center', valign:'middle' } } },
+                    { text: { text: '∂', options: { x: 5.60, y: 4.50, w: 0.90, h: 0.90, fontFace:'Arial', fontSize: 54, color:'ECF1FB', align:'center', valign:'middle' } } },
+                    { text: { text: '∈', options: { x: 2.40, y: 1.60, w: 0.90, h: 0.90, fontFace:'Arial', fontSize: 52, color:'EDF2FC', align:'center', valign:'middle' } } },
+                ] : [];
+
                 pptx.defineSlideMaster({
                     title: "MASTER_ACADEMIC",
                     background: { color: h(T.bg) },
                     objects: [
-                        // Thanh footer
-                        { rect: { x: 0, y: "90%", w: "100%", h: "10%", fill: { color: h(T.footerBg) } } },
-                        // Text tên tác giả (chừa 14% bên phải cho số trang)
+                        ...vtlWatermarks,
+                        // Thanh footer — mỏng 5% (≈ 0.375")
+                        { rect: { x: 0, y: "95%", w: "100%", h: "5%", fill: { color: h(T.footerBg) } } },
+                        // Text tên tác giả
                         { text: { text: footerText, options: {
-                            x: 0, y: "90%", w: "86%", h: "10%",
-                            fontSize: 18, color: h(T.footerText), fontFace: footerFont,
+                            x: 0, y: "95%", w: "86%", h: "5%",
+                            fontSize: 13, color: h(T.footerText), fontFace: footerFont,
                             align: "center", valign: "middle"
                         }}}
                     ]
@@ -2396,11 +2423,33 @@ D. sinA / a = 2R
 
                     // ── Số trang — in trực tiếp vào mỗi slide (góc phải footer) ──
                     slide.addText(String(slideNum), {
-                        x: "86%", y: "90%", w: "13%", h: "10%",
-                        fontFace: "Arial", fontSize: 17,
+                        x: "86%", y: "95%", w: "13%", h: "5%",
+                        fontFace: "Arial", fontSize: 13,
                         color: h(T.footerText), bold: true,
                         align: "right", valign: "middle"
                     });
+
+                    // ── VTL Brand: logo bo tròn góc trên phải + đường accent ──
+                    if (selectedTheme === 'vtl') {
+                        // Đường kẻ vàng mỏng sát mép trên (accent line)
+                        slide.addShape(pptx.ShapeType.rect, {
+                            x: 0, y: 0, w: 10, h: 0.028,
+                            fill: { color: 'C5922C' }, line: { color: 'C5922C' }
+                        });
+                        // Badge VTL — hình chữ nhật bo tròn góc trên phải
+                        slide.addShape(pptx.ShapeType.roundRect, {
+                            x: 9.18, y: 0.05, w: 0.74, h: 0.27,
+                            fill: { color: '1B3B77' },
+                            line: { color: 'C5922C', width: 1.2 },
+                            rectRadius: 0.10,
+                        });
+                        slide.addText('VTL', {
+                            x: 9.18, y: 0.05, w: 0.74, h: 0.27,
+                            fontFace: 'Arial', fontSize: 12, bold: true,
+                            color: 'FFFFFF', align: 'center', valign: 'middle',
+                            charSpacing: 2,
+                        });
+                    }
 
                     if (contentMode === 'quiz') {
                         const { questionText, options, solution, isTitleOnly } = parseQuizSlide(slideContent);
