@@ -1,0 +1,2717 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trình tạo Slide Sư phạm Pro</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PptxGenJS Library -->
+    <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/libs/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+
+        /* Toast animation */
+        @keyframes slideInUp {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .toast-animate { animation: slideInUp 0.3s ease-out forwards; }
+
+        /* Modal Animation */
+        .modal-enter { opacity: 0; transform: scale(0.95); transition: all 0.2s ease-out; }
+        .modal-enter-active { opacity: 1; transform: scale(1); }
+        .modal-leave { opacity: 1; transform: scale(1); transition: all 0.2s ease-in; }
+        .modal-leave-active { opacity: 0; transform: scale(0.95); }
+
+        /* =====================================================
+           ACCORDION — Settings panel collapsible groups
+        ====================================================== */
+        .acc-header {
+            display: flex; align-items: center; justify-content: space-between;
+            cursor: pointer; user-select: none;
+            padding: 10px 14px;
+            border-radius: 8px;
+            transition: background 0.15s;
+        }
+        .acc-header:hover { background: #f0f4ff; }
+        .acc-header.open  { background: #eef2ff; }
+        .acc-chevron {
+            width: 16px; height: 16px; flex-shrink: 0;
+            transition: transform 0.25s ease;
+            color: #6366f1;
+        }
+        .acc-header.open .acc-chevron { transform: rotate(90deg); }
+        .acc-body {
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            transition: max-height 0.3s ease, opacity 0.25s ease, padding 0.25s ease;
+            padding: 0 14px;
+        }
+        .acc-body.open {
+            max-height: 1200px;
+            opacity: 1;
+            padding: 0 14px 12px 14px;
+        }
+        .acc-group {
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 8px;
+            background: white;
+        }
+        .acc-group + .acc-group { margin-top: 0; }
+
+        /* =====================================================
+           PREVIEW PANEL — Slide cards 16:9
+        ====================================================== */
+        #previewPanel {
+            background: #e5e7eb;
+        }
+        .preview-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            padding: 16px;
+        }
+        /* Wrapper giữ tỉ lệ 16:9
+           container-type cho phép dùng cqw bên trong */
+        .slide-card-wrap {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%;
+            border-radius: 7px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.14);
+            border: 2px solid transparent;
+            transition: border-color 0.15s, box-shadow 0.15s;
+            cursor: default;
+            container-type: inline-size; /* ← CQW anchor */
+        }
+        .slide-card-wrap:hover {
+            border-color: #6366f1;
+            box-shadow: 0 4px 16px rgba(99,102,241,0.22);
+        }
+        /* Nội dung bên trong, absolute fill */
+        .slide-card-inner {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        .slide-content-area {
+            flex: 1;
+            padding: 4% 5% 1% 5%;   /* tighter → more room for 9 lines */
+            overflow: hidden;
+        }
+        .slide-footer-bar {
+            height: 10%;
+            min-height: 10%;
+            max-height: 10%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 5%;
+            flex-shrink: 0;
+        }
+        .slide-title {
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 2%;    /* was 6% — freed 4% height */
+            word-break: break-word;
+        }
+        .slide-bullet {
+            display: flex;
+            align-items: flex-start;
+            gap: 4px;
+            margin-bottom: 1.2%;  /* was 3% — fits 9 bullets now */
+            line-height: 1.3;
+            word-break: break-word;
+        }
+        .slide-bullet-dot {
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 3px;
+        }
+        /* Quiz option badge */
+        .quiz-option-row {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 1.5%;
+        }
+        .quiz-badge {
+            width: 15px; height: 15px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.8cqw; font-weight: 700;
+            flex-shrink: 0;
+        }
+        .quiz-sol-box {
+            border-radius: 3px;
+            padding: 2% 3%;
+            margin-top: 2%;
+            font-size: 2cqw;   /* was 72% of parent → fixed to cqw */
+            line-height: 1.35;
+        }
+        /* Số thứ tự slide — badge góc trên trái */
+        .slide-num-badge {
+            position: absolute;
+            top: 5px; left: 5px;
+            background: rgba(0,0,0,0.4);
+            color: #fff;
+            font-size: 8px; font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 99px;
+            z-index: 10;
+            letter-spacing: 0.02em;
+        }
+        /* Thông báo "Chưa có nội dung" */
+        .preview-empty {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            height: 100%; color: #9ca3af;
+            gap: 8px; padding: 40px;
+        }
+
+        /* =====================================================
+           EDITOR TOOLBAR
+        ====================================================== */
+        #editorToolbar {
+            background: #fafafa;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .tb-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            height: 26px; min-width: 26px; padding: 0 7px;
+            border: 1px solid #e2e8f0; border-radius: 5px;
+            background: #fff; cursor: pointer;
+            font-size: 11px; font-weight: 700; color: #4b5563;
+            transition: background 0.1s, border-color 0.1s, color 0.1s;
+            white-space: nowrap; user-select: none; gap: 4px;
+        }
+        .tb-btn:hover { background: #eef2ff; border-color: #a5b4fc; color: #4338ca; }
+        .tb-btn:active { background: #e0e7ff; }
+        .tb-btn.active { background: #e0e7ff; border-color: #818cf8; color: #4338ca; }
+        .tb-sep { width: 1px; height: 18px; background: #e5e7eb; margin: 0 3px; flex-shrink: 0; }
+        .tb-label { font-size: 10px; font-weight: 600; color: #9ca3af; letter-spacing: .04em; padding: 0 4px; }
+
+        /* Find & Replace */
+        #findReplacePanel input::placeholder { color: #9ca3af; }
+        #findReplacePanel input:focus { outline: none; box-shadow: 0 0 0 2px #a5b4fc; }
+
+        /* =====================================================
+           TABLE trong preview slide
+        ====================================================== */
+        .slide-table {
+            width: 100%; border-collapse: collapse;
+            margin-bottom: 2%; font-family: Arial, sans-serif;
+        }
+        .slide-table th {
+            font-size: 2cqw; font-weight: 700; padding: 1.5% 2%;
+            border: 1px solid transparent; text-align: center;
+        }
+        .slide-table td {
+            font-size: 1.9cqw; padding: 1.2% 2%;
+            border: 1px solid rgba(0,0,0,0.07); text-align: center;
+        }
+
+        /* =====================================================
+           COLOR PICKER — custom theme
+        ====================================================== */
+        .cp-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 6px; padding-top: 4px;
+        }
+        .cp-item label {
+            display: block; font-size: 10px; font-weight: 500;
+            color: #6b7280; margin-bottom: 2px;
+        }
+        .cp-item input[type=color] {
+            width: 100%; height: 28px; padding: 2px 3px;
+            border: 1px solid #e5e7eb; border-radius: 6px;
+            cursor: pointer; background: white;
+        }
+        .cp-item input[type=color]:hover { border-color: #a5b4fc; }
+
+        /* ── FONT SIZE CONTROL ── */
+        .fs-mode-btn {
+            cursor:pointer; border:1.5px solid #e5e7eb; border-radius:9px;
+            padding:6px 4px; text-align:center; transition:all .15s;
+            background:#fff; user-select:none;
+        }
+        .fs-mode-btn:hover { border-color:#818cf8; background:#eef2ff; }
+        .fs-mode-btn.active { border-color:#4f46e5; background:#eef2ff; }
+        .fs-mode-btn .fsm-icon { font-size:17px; display:block; margin-bottom:1px; }
+        .fs-mode-btn .fsm-label { font-size:11px; font-weight:700; color:#374151; display:block; }
+        .fs-mode-btn.active .fsm-label { color:#4338ca; }
+        .fs-mode-btn .fsm-desc { font-size:10px; color:#9ca3af; display:block; margin-top:1px; }
+        .fs-bar-wrap { display:flex; gap:3px; margin:6px 0 2px; }
+        .fs-bar-seg {
+            flex:1; height:5px; border-radius:3px;
+            background:#e5e7eb; transition:background .2s;
+        }
+        .fs-bar-seg.on { background:#6366f1; }
+        input[type=range].fs-slider {
+            -webkit-appearance:none; width:100%; height:4px;
+            border-radius:2px; background:#e0e7ff; outline:none;
+        }
+        input[type=range].fs-slider::-webkit-slider-thumb {
+            -webkit-appearance:none; width:16px; height:16px; border-radius:50%;
+            background:#6366f1; cursor:pointer; border:2px solid white;
+            box-shadow:0 1px 4px rgba(0,0,0,.22);
+        }
+        .fs-pill {
+            display:inline-block; padding:1px 7px; border-radius:10px;
+            background:#e0e7ff; color:#4338ca; font-size:11px; font-weight:700;
+        }
+
+        /* Save indicator */
+        #saveIndicator {
+            font-size: 10px; color: #10b981; font-weight: 500;
+            transition: opacity 0.5s ease; opacity: 0;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden text-gray-800 relative">
+
+    <!-- Header — compact single-line -->
+    <header class="bg-white border-b border-gray-200 px-4 py-2 flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-2">
+            <div class="bg-indigo-600 p-1.5 rounded-md">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
+                </svg>
+            </div>
+            <span class="text-sm font-bold text-gray-900 tracking-tight">EduSlide Pro</span>
+            <span class="text-xs text-gray-400 hidden md:inline">— Markdown → PowerPoint chuẩn sư phạm</span>
+        </div>
+        <button onclick="generatePPT()" id="generateBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-1.5 px-4 rounded-md transition duration-150 ease-in-out flex items-center gap-1.5 text-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            <span id="btnText">Tạo & Tải .PPTX</span>
+        </button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex overflow-hidden">
+        <!-- Editor Section -->
+        <div class="w-2/3 h-full flex flex-col border-r border-gray-200 bg-white">
+
+            <!-- Tab bar -->
+            <div class="px-4 py-2 border-b border-gray-100 bg-gray-50 flex justify-between items-center shrink-0 relative">
+                <div class="flex space-x-6">
+                    <button id="tab-basic"    onclick="switchTab('basic')"    class="text-sm font-semibold text-indigo-700 uppercase tracking-wider pb-1 border-b-2 border-indigo-700 transition-colors">Soạn thảo Cơ bản</button>
+                    <button id="tab-quiz"     onclick="switchTab('quiz')"     class="text-sm font-semibold text-gray-500 uppercase tracking-wider pb-1 border-b-2 border-transparent hover:text-indigo-600 transition-colors">Trắc nghiệm</button>
+                    <!-- TAB XEM TRƯỚC -->
+                    <button id="tab-preview"  onclick="switchTab('preview')"  class="text-sm font-semibold text-gray-500 uppercase tracking-wider pb-1 border-b-2 border-transparent hover:text-emerald-600 transition-colors flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.069A1 1 0 0121 8.87V15.13a1 1 0 01-1.447.9L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+                        Xem trước
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <span id="slideCounter" class="text-xs font-semibold text-indigo-500 bg-indigo-50 px-2 py-1 rounded hidden md:inline">0 slide</span>
+                    <span id="saveIndicator" class="hidden md:inline">✓ Đã lưu</span>
+                    <span class="text-xs text-gray-500 hidden md:inline">Ngăn cách bằng ---</span>
+                    <!-- Nút Xóa hết — double-click confirmation -->
+                    <button id="clearBtn" onclick="clearContent()" class="flex items-center gap-1.5 text-sm font-semibold text-red-500 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded border border-red-200 transition-colors shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        <span id="clearBtnText">Xóa hết</span>
+                    </button>
+                    <button onclick="openPromptModal()" class="flex items-center gap-1.5 text-sm font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded border border-purple-200 transition-colors shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        Sinh Prompt AI
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── EDITOR TOOLBAR ── -->
+            <div id="editorToolbar" class="px-3 py-1.5 flex flex-wrap items-center gap-1 shrink-0">
+
+                <!-- Nhóm Basic -->
+                <div id="toolbarBasic" class="flex items-center gap-1 flex-wrap">
+                    <span class="tb-label">CẤU TRÚC</span>
+                    <button class="tb-btn" onclick="insertLinePrefix('markdownInput','# ')" title="Tiêu đề chính (# H1)">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M4 6h16M4 12h8"/></svg>H1
+                    </button>
+                    <button class="tb-btn" onclick="insertLinePrefix('markdownInput','## ')" title="Subtitle (## H2)" style="font-size:10px;">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h10"/></svg>H2
+                    </button>
+                    <button class="tb-btn" onclick="insertLinePrefix('markdownInput','- ')" title="Gạch đầu dòng (-)">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+                    </button>
+                    <button class="tb-btn" onclick="insertSlideBreak('markdownInput')" title="Ngắt slide mới (---)">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 12h16"/></svg>Ngắt
+                    </button>
+
+                    <div class="tb-sep"></div>
+                    <span class="tb-label">ĐỊNH DẠNG</span>
+                    <button class="tb-btn font-black" onclick="wrapSelection('markdownInput','**','**')" title="In đậm (**text**)">B</button>
+                    <button class="tb-btn italic" onclick="wrapSelection('markdownInput','_','_')" title="In nghiêng (_text_)" style="font-family:Georgia,serif;">I</button>
+                    <button class="tb-btn" onclick="wrapSelection('markdownInput','`','`')" title="Code inline (`text`)" style="font-family:monospace;">&lt;/&gt;</button>
+
+                    <div class="tb-sep"></div>
+                    <span class="tb-label">CHÈN</span>
+                    <button class="tb-btn" onclick="insertTableTemplate()" title="Chèn bảng Markdown mẫu" style="color:#0369a1;">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 6h18M3 14h18M3 18h18M8 6v12M16 6v12"/></svg>
+                        Bảng
+                    </button>
+                    <button class="tb-btn" onclick="insertTemplate('cover')" title="Chèn Slide Bìa mẫu" style="color:#4338ca;">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                        Slide Bìa
+                    </button>
+                    <button class="tb-btn" onclick="insertTemplate('slide')" title="Chèn Slide thông thường mẫu">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        Slide mới
+                    </button>
+                    <button class="tb-btn" onclick="insertSymbol('markdownInput')" title="Chèn ký tự toán học / đặc biệt" style="color:#059669;">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                        Ký tự
+                    </button>
+                    <button class="tb-btn" onclick="triggerImgUpload()" title="Chèn ảnh — slide tự tách đôi trái/phải (![img])" style="color:#b45309;">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke-width="2"/><circle cx="8.5" cy="8.5" r="1.5" stroke-width="2"/><polyline points="21 15 16 10 5 21" stroke-width="2"/></svg>
+                        Ảnh
+                    </button>
+                    <input type="file" id="imgFileInput" accept="image/*" class="hidden" onchange="onImgFileSelected(event)">
+                </div>
+
+                <!-- Nhóm Quiz (ẩn khi ở tab basic) -->
+                <div id="toolbarQuiz" class="flex items-center gap-1 flex-wrap hidden">
+                    <span class="tb-label">CẤU TRÚC</span>
+                    <button class="tb-btn" onclick="insertQuizTemplate('title')" title="Chèn tiêu đề phần" style="color:#4338ca;">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                        Tiêu đề
+                    </button>
+                    <button class="tb-btn" onclick="insertQuizTemplate('question')" title="Chèn câu hỏi trắc nghiệm mới">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        Câu hỏi mới
+                    </button>
+                    <button class="tb-btn" onclick="insertSlideBreak('quizInput')" title="Ngắt slide mới (---)">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 12h16"/></svg>Ngắt
+                    </button>
+                    <div class="tb-sep"></div>
+                    <span class="tb-label">ĐỊNH DẠNG</span>
+                    <button class="tb-btn font-black" onclick="wrapSelection('quizInput','**','**')" title="In đậm">B</button>
+                    <button class="tb-btn italic" onclick="wrapSelection('quizInput','_','_')" title="In nghiêng" style="font-family:Georgia,serif;">I</button>
+                    <button class="tb-btn" onclick="insertSymbol('quizInput')" title="Ký tự đặc biệt" style="color:#059669;font-family:monospace;">Ω</button>
+                </div>
+
+                <!-- Tìm & Thay — luôn hiển thị bên phải -->
+                <div class="ml-auto">
+                    <button id="findReplaceBtn" onclick="toggleFindReplace()" title="Tìm & Thay thế (Ctrl+H)" class="tb-btn">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        Tìm &amp; Thay
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── FIND & REPLACE PANEL ── -->
+            <div id="findReplacePanel" class="hidden px-4 py-2 border-b border-indigo-100 bg-indigo-50 shrink-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <input id="findInput" type="text" placeholder="🔍 Tìm..." class="px-2.5 py-1.5 border border-gray-300 rounded-md text-sm bg-white w-36 focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" autocomplete="off">
+                    <input id="replaceInput" type="text" placeholder="✏️ Thay bằng..." class="px-2.5 py-1.5 border border-gray-300 rounded-md text-sm bg-white w-40 focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" autocomplete="off">
+                    <button onclick="findNext()" class="tb-btn">Tìm tiếp ↓</button>
+                    <button onclick="replaceOne()" class="tb-btn" style="color:#4338ca;border-color:#a5b4fc;">Thay 1</button>
+                    <button onclick="replaceAll()" class="tb-btn" style="background:#4338ca;color:#fff;border-color:#4338ca;">Thay tất cả</button>
+                    <span id="findStatus" class="text-xs text-gray-500 ml-1"></span>
+                    <button onclick="toggleFindReplace()" class="ml-auto text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-white transition" title="Đóng (Esc)">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Symbol Picker (popup) -->
+            <div id="symbolPicker" class="hidden absolute z-40 bg-white border border-gray-200 shadow-xl rounded-xl p-3 w-72" style="top:0;left:0;">
+                <div class="text-xs font-semibold text-gray-500 mb-2 flex justify-between items-center">
+                    Chèn ký tự đặc biệt
+                    <button onclick="document.getElementById('symbolPicker').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">✕</button>
+                </div>
+                <div id="symbolGrid" class="grid grid-cols-8 gap-1"></div>
+            </div>
+
+            <!-- Textarea: Basic -->
+            <textarea id="markdownInput" class="flex-1 w-full px-5 py-4 resize-none focus:outline-none focus:ring-0 custom-scrollbar text-gray-700 text-sm leading-relaxed block" spellcheck="false" style="font-size:13.5px;line-height:1.7;">
+# Phương trình Đường tròn
+## Chương trình Toán 10 — Hình học Giải tích
+---
+# Phương trình đường tròn: Dạng cơ bản
+## Tâm I(a, b), Bán kính R > 0
+- Phương trình: (x - a)² + (y - b)² = R²
+- Đặc biệt tâm O(0,0): x² + y² = R²
+- Điều kiện: R > 0
+---
+# Mô hình 4 bước giải quyết vấn đề của Pólya
+- Bước 1: Hiểu rõ bài toán (Giả thiết, Kết luận)
+- Bước 2: Lập kế hoạch giải (Tìm mối liên hệ)
+- Bước 3: Thực hiện kế hoạch (Trình bày chi tiết)
+- Bước 4: Nhìn lại vấn đề (Kiểm tra và Mở rộng)
+---
+# Tiêu chí một slide báo cáo xuất sắc
+- Mỗi slide chỉ truyền tải đúng một ý tưởng.
+- Lược bỏ chữ thừa, chỉ sử dụng từ khóa cốt lõi.
+- Hình ảnh/Đồ thị phải sắc nét, dễ nhìn từ xa.</textarea>
+
+            <!-- Textarea: Quiz -->
+            <textarea id="quizInput" class="flex-1 w-full px-5 py-4 resize-none focus:outline-none focus:ring-0 custom-scrollbar text-gray-700 text-sm leading-relaxed hidden" spellcheck="false" style="font-size:13.5px;line-height:1.7;">
+**BÀI TẬP TRẮC NGHIỆM: HỆ THỨC LƯỢNG TRONG TAM GIÁC**
+---
+**Câu 1:** Cho tam giác ABC có độ dài các cạnh tương ứng là a, b, c và góc A. Đẳng thức nào sau đây là biểu diễn đúng của định lí côsin?
+A. a² = b² + c² + 2bc.cosA
+B. a² = b² + c² - 2bc.cosA
+C. a² = b² + c² - 2bc.sinA
+D. a² = b² - c² - 2bc.cosA
+
+**Lời giải chi tiết:**
+* **Chọn B.**
+* Theo định lí côsin, bình phương độ dài một cạnh bằng tổng bình phương hai cạnh còn lại trừ đi hai lần tích của hai cạnh đó với côsin góc xen giữa.
+---
+**Câu 2:** Cho tam giác ABC nội tiếp đường tròn bán kính R. Đẳng thức nào sau đây đúng theo định lí sin?
+A. a / sinA = R
+B. a / cosA = 2R
+C. a / sinA = 2R
+D. sinA / a = 2R
+
+**Lời giải chi tiết:**
+* **Chọn C.**
+* Định lí sin khẳng định tỉ số giữa độ dài một cạnh và sin góc đối diện bằng 2R.</textarea>
+
+            <!-- PREVIEW PANEL (ẩn khi không ở tab preview) -->
+            <div id="previewPanel" class="flex-1 w-full overflow-y-auto custom-scrollbar hidden" style="min-height:0;">
+                <div id="previewGrid" class="preview-grid"></div>
+            </div>
+
+        </div>
+
+        <!-- Settings & Instructions Section — Accordion -->
+        <div class="w-1/3 h-full bg-gray-50 py-4 px-4 overflow-y-auto custom-scrollbar">
+
+            <!-- ── ACCORDION 1: Tên file & Footer ── -->
+            <div class="acc-group">
+                <div class="acc-header open" onclick="toggleAcc('acc-file')">
+                    <span class="flex items-center gap-2 text-sm font-semibold text-indigo-700">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        Tên file &amp; Footer
+                    </span>
+                    <svg id="acc-file-chev" class="acc-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                </div>
+                <div class="acc-body open" id="acc-file-body">
+                    <div class="space-y-3 pt-1">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Tên file xuất (.pptx)</label>
+                            <input type="text" id="fileNameInput" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm font-medium" placeholder="Bai_Giang_Toan_12" value="Bai_Giang">
+                            <p class="text-xs text-gray-400 mt-1">Không gõ đuôi .pptx, tránh dấu cách.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Trường / Lớp <span class="text-gray-400 font-normal">(hiện trên Slide bìa)</span></label>
+                            <input type="text" id="schoolInput" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm font-medium" placeholder="THPT Nguyễn Hữu Cảnh — Lớp 12A" value="">
+                            <p class="text-xs text-gray-400 mt-1">Hiển thị dưới subtitle trên slide bìa (slide không có dấu -).</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Tên tác giả / Footer</label>
+                            <input type="text" id="footerInput" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm font-medium" value="Vũ Tiến Lực NHC - 0969068849">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Font Footer</label>
+                            <select id="footerFont" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+                                <option value="Arial">Arial (Phổ biến)</option>
+                                <option value="Calibri">Calibri (Office)</option>
+                                <option value="Times New Roman">Times New Roman</option>
+                                <option value="Tahoma">Tahoma (Sắc nét)</option>
+                                <option value="Georgia">Georgia (Trang trọng)</option>
+                            </select>
+                        </div>
+                        <p class="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+                            ⚠️ PPTX hiển thị đúng font khi máy người mở <strong>đã cài</strong> font đó.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── ACCORDION 2: Mẫu giao diện ── -->
+            <div class="acc-group">
+                <div class="acc-header" onclick="toggleAcc('acc-theme')">
+                    <span class="flex items-center gap-2 text-sm font-semibold text-indigo-700">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                        Mẫu giao diện
+                        <span id="theme-badge" class="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Trắng</span>
+                    </span>
+                    <svg id="acc-theme-chev" class="acc-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                </div>
+                <div class="acc-body" id="acc-theme-body">
+                    <div class="grid grid-cols-1 gap-1.5 pt-1" id="themeRadioGroup">
+                        <label class="flex items-center gap-3 p-2.5 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition" onclick="updateThemeBadge('Trắng')">
+                            <input type="radio" name="themeMode" value="light" class="text-indigo-600 w-3.5 h-3.5" checked>
+                            <span class="text-sm text-gray-800">Trắng tinh tế</span>
+                            <div class="ml-auto w-4 h-4 rounded border border-gray-300 bg-white flex-shrink-0"></div>
+                        </label>
+                        <label class="flex items-center gap-3 p-2.5 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition" onclick="updateThemeBadge('Tối')">
+                            <input type="radio" name="themeMode" value="dark" class="text-indigo-600 w-3.5 h-3.5">
+                            <span class="text-sm text-gray-800">Tối hiện đại</span>
+                            <div class="ml-auto w-4 h-4 rounded border border-gray-600 bg-gray-800 flex-shrink-0"></div>
+                        </label>
+                        <label class="flex items-center gap-3 p-2.5 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition" onclick="updateThemeBadge('Hoàng Gia')">
+                            <input type="radio" name="themeMode" value="brand" class="text-indigo-600 w-3.5 h-3.5">
+                            <span class="text-sm text-gray-800">Xanh Hoàng Gia</span>
+                            <div class="ml-auto w-4 h-4 rounded border border-amber-400 bg-slate-900 flex-shrink-0"></div>
+                        </label>
+                        <label class="flex items-center gap-3 p-2.5 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition" onclick="updateThemeBadge('Giấy')">
+                            <input type="radio" name="themeMode" value="paper" class="text-indigo-600 w-3.5 h-3.5">
+                            <span class="text-sm text-gray-800">Nền giấy (Vintage)</span>
+                            <div class="ml-auto w-4 h-4 rounded border border-amber-200 flex-shrink-0" style="background:#FDFBF7"></div>
+                        </label>
+                        <label class="flex items-center gap-3 p-2.5 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition" onclick="updateThemeBadge('Xanh')">
+                            <input type="radio" name="themeMode" value="blue" class="text-indigo-600 w-3.5 h-3.5">
+                            <span class="text-sm text-gray-800">Xanh dịu mát</span>
+                            <div class="ml-auto w-4 h-4 rounded border border-blue-300 bg-blue-50 flex-shrink-0"></div>
+                        </label>
+                        <label class="flex items-center gap-3 p-2.5 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition" onclick="updateThemeBadge('Hồng')">
+                            <input type="radio" name="themeMode" value="pink" class="text-indigo-600 w-3.5 h-3.5">
+                            <span class="text-sm text-gray-800">Hồng năng động</span>
+                            <div class="ml-auto w-4 h-4 rounded border border-pink-300 bg-pink-50 flex-shrink-0"></div>
+                        </label>
+
+                        <!-- ── Custom color picker ── -->
+                        <div class="border-t border-gray-100 mt-1.5 pt-2">
+                            <label class="flex items-center gap-3 p-2.5 border-2 border-indigo-200 rounded-lg cursor-pointer hover:bg-indigo-50 transition" onclick="updateThemeBadge('Tùy chỉnh')">
+                                <input type="radio" name="themeMode" value="custom" class="text-indigo-600 w-3.5 h-3.5" id="radioCustomTheme">
+                                <span class="text-sm font-semibold text-indigo-700">🎨 Tùy chỉnh màu</span>
+                                <div class="ml-auto w-4 h-4 rounded border border-indigo-300 flex-shrink-0" id="customThemeSwatch" style="background:#FFFFFF;"></div>
+                            </label>
+                            <div class="cp-grid mt-2">
+                                <div class="cp-item">
+                                    <label>Nền slide</label>
+                                    <input type="color" id="cpBg" value="#FFFFFF" oninput="updateCustomTheme()">
+                                </div>
+                                <div class="cp-item">
+                                    <label>Tiêu đề</label>
+                                    <input type="color" id="cpTitle" value="#1E3A8A" oninput="updateCustomTheme()">
+                                </div>
+                                <div class="cp-item">
+                                    <label>Văn bản</label>
+                                    <input type="color" id="cpText" value="#374151" oninput="updateCustomTheme()">
+                                </div>
+                                <div class="cp-item">
+                                    <label>Accent / Badge</label>
+                                    <input type="color" id="cpAccent" value="#4F46E5" oninput="updateCustomTheme()">
+                                </div>
+                                <div class="cp-item">
+                                    <label>Footer nền</label>
+                                    <input type="color" id="cpFooterBg" value="#F3F4F6" oninput="updateCustomTheme()">
+                                </div>
+                                <div class="cp-item">
+                                    <label>Footer chữ</label>
+                                    <input type="color" id="cpFooterText" value="#9CA3AF" oninput="updateCustomTheme()">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── ACCORDION 3: Chế độ hiển thị ── -->
+            <div class="acc-group">
+                <div class="acc-header" onclick="toggleAcc('acc-mode')">
+                    <span class="flex items-center gap-2 text-sm font-semibold text-indigo-700">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+                        Chế độ hiển thị
+                    </span>
+                    <svg id="acc-mode-chev" class="acc-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                </div>
+                <div class="acc-body" id="acc-mode-body">
+                    <div class="pt-1 pb-1">
+                        <label class="flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg cursor-pointer hover:bg-indigo-100 transition">
+                            <input type="checkbox" id="spaceSavingMode" class="text-indigo-600 focus:ring-indigo-500 w-4 h-4 rounded">
+                            <div>
+                                <div class="text-sm font-medium text-indigo-800">Tối ưu không gian</div>
+                                <div class="text-xs text-indigo-500 mt-0.5">Tràn viền, chữ to, ít lề</div>
+                            </div>
+                        </label>
+                        <p class="text-xs text-gray-400 mt-2">Kéo giãn lề trái phải tối đa để chứa nhiều văn bản hơn mỗi slide.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── ACCORDION 3b: Cỡ chữ thông minh ── -->
+            <div class="acc-group">
+                <div class="acc-header" onclick="toggleAcc('acc-fontsize')">
+                    <span class="flex items-center gap-2 text-sm font-semibold text-indigo-700">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                        Cỡ chữ thông minh
+                        <span id="fs-badge" class="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Tự động</span>
+                    </span>
+                    <svg id="acc-fontsize-chev" class="acc-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                </div>
+                <div class="acc-body" id="acc-fontsize-body">
+                    <div class="pt-1">
+                        <!-- 5 mode cards -->
+                        <div class="grid grid-cols-5 gap-1.5 mb-3">
+                            <button class="fs-mode-btn active" data-fsmode="auto" onclick="selectFsMode(this)">
+                                <span class="fsm-icon">🤖</span><span class="fsm-label">Tự động</span><span class="fsm-desc">Thông minh</span>
+                            </button>
+                            <button class="fs-mode-btn" data-fsmode="large" onclick="selectFsMode(this)">
+                                <span class="fsm-icon">🔠</span><span class="fsm-label">Lớn</span><span class="fsm-desc">≤3 dòng</span>
+                            </button>
+                            <button class="fs-mode-btn" data-fsmode="medium" onclick="selectFsMode(this)">
+                                <span class="fsm-icon">🔡</span><span class="fsm-label">Vừa</span><span class="fsm-desc">≤5 dòng</span>
+                            </button>
+                            <button class="fs-mode-btn" data-fsmode="small" onclick="selectFsMode(this)">
+                                <span class="fsm-icon">📝</span><span class="fsm-label">Nhỏ</span><span class="fsm-desc">≤7 dòng</span>
+                            </button>
+                            <button class="fs-mode-btn" data-fsmode="custom" onclick="selectFsMode(this)">
+                                <span class="fsm-icon">⚙️</span><span class="fsm-label">Tùy chỉnh</span><span class="fsm-desc">Thủ công</span>
+                            </button>
+                        </div>
+
+                        <!-- Size preview bar -->
+                        <div class="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mb-2">
+                            <div class="flex justify-between text-xs font-medium text-indigo-700 mb-1">
+                                <span>Tiêu đề: <span class="fs-pill" id="previewTitleSize">28–40</span></span>
+                                <span>Nội dung: <span class="fs-pill" id="previewBodySize">16–28</span></span>
+                                <span>Bảng: <span class="fs-pill" id="previewTableSize">14–20</span></span>
+                            </div>
+                            <div class="fs-bar-wrap" id="fsCapacityBar"></div>
+                            <div class="text-center text-xs text-indigo-400 mt-0.5" id="fsCapacityLabel">Tối ưu cho 4–5 dòng nội dung mỗi slide</div>
+                        </div>
+
+                        <!-- Custom sliders (hidden by default) -->
+                        <div id="fsCustomPanel" class="hidden space-y-3 pt-1 pb-1">
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="text-xs font-medium text-gray-600">Tiêu đề <code class="bg-gray-100 px-1 rounded text-pink-500 text-xs">#</code></label>
+                                    <span class="text-sm font-bold text-indigo-600" id="titleSizeLabel">40pt</span>
+                                </div>
+                                <input type="range" class="fs-slider" id="titleSizeSlider" min="24" max="54" step="2" value="40" oninput="onFsSlidersChange()">
+                                <div class="flex justify-between text-xs text-gray-300 mt-0.5"><span>24pt</span><span>54pt</span></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="text-xs font-medium text-gray-600">Phụ đề <code class="bg-gray-100 px-1 rounded text-pink-500 text-xs">##</code></label>
+                                    <span class="text-sm font-bold text-indigo-600" id="subSizeLabel">26pt</span>
+                                </div>
+                                <input type="range" class="fs-slider" id="subSizeSlider" min="14" max="34" step="2" value="26" oninput="onFsSlidersChange()">
+                                <div class="flex justify-between text-xs text-gray-300 mt-0.5"><span>14pt</span><span>34pt</span></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="text-xs font-medium text-gray-600">Nội dung <code class="bg-gray-100 px-1 rounded text-pink-500 text-xs">-</code> dòng</label>
+                                    <span class="text-sm font-bold text-indigo-600" id="bodySizeLabel">28pt</span>
+                                </div>
+                                <input type="range" class="fs-slider" id="bodySizeSlider" min="14" max="34" step="2" value="28" oninput="onFsSlidersChange()">
+                                <div class="flex justify-between text-xs text-gray-300 mt-0.5"><span>14pt</span><span>34pt</span></div>
+                            </div>
+                        </div>
+
+                        <p class="text-xs text-gray-400 mt-1 pb-1">
+                            🤖 <strong>Tự động</strong>: phân tích từng slide, chọn cỡ chữ lớn nhất có thể mà không bị tràn hay chồng chéo.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── ACCORDION 4: Cú pháp cơ bản ── -->
+            <div class="acc-group mt-2">
+                <div class="acc-header" onclick="toggleAcc('acc-syntax')">
+                    <span class="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                        <svg class="w-4 h-4 flex-shrink-0 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        Cú pháp Markdown
+                    </span>
+                    <svg id="acc-syntax-chev" class="acc-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                </div>
+                <div class="acc-body" id="acc-syntax-body">
+                    <ul class="text-sm text-gray-600 space-y-2 list-none pt-1">
+                        <li class="flex items-center gap-2"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-pink-600 font-mono text-xs">#</code> Tiêu đề chính slide</li>
+                        <li class="flex items-center gap-2"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-pink-600 font-mono text-xs">##</code> Subtitle / chú thích nhỏ dưới tiêu đề</li>
+                        <li class="flex items-center gap-2"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-pink-600 font-mono text-xs">-</code> Gạch đầu dòng nội dung</li>
+                        <li class="flex items-center gap-2"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-pink-600 font-mono text-xs">---</code> Ngăn cách slide mới</li>
+                        <li class="flex items-start gap-2 bg-indigo-50 rounded p-1.5"><code class="bg-indigo-100 px-1.5 py-0.5 rounded text-indigo-700 font-mono text-xs flex-shrink-0"># + ##</code><span class="text-indigo-700 text-xs">Slide chỉ có <code class="font-mono">#</code> và <code class="font-mono">##</code>, không có <code class="font-mono">-</code> → tự động thành <strong>Slide Bìa</strong></span></li>
+                        <li class="flex items-start gap-2 bg-blue-50 rounded p-1.5"><code class="bg-blue-100 px-1.5 py-0.5 rounded text-blue-700 font-mono text-xs flex-shrink-0">| A | B |</code><span class="text-blue-700 text-xs">Bảng Markdown → bảng thật trong PPTX. Dòng 2 là <code>|---|---|</code></span></li>
+                        <li class="flex items-center gap-2"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-pink-600 font-mono text-xs">A.</code> Đáp án trắc nghiệm</li>
+                        <li class="flex items-center gap-2"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-pink-600 font-mono text-xs">* **Chọn B.**</code> Lời giải</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- ── ACCORDION 5: Chuẩn sư phạm ── -->
+            <div class="acc-group">
+                <div class="acc-header" onclick="toggleAcc('acc-pedagogy')">
+                    <span class="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                        <svg class="w-4 h-4 flex-shrink-0 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        Chuẩn Sư phạm
+                    </span>
+                    <svg id="acc-pedagogy-chev" class="acc-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                </div>
+                <div class="acc-body" id="acc-pedagogy-body">
+                    <ul class="text-sm text-gray-600 space-y-2 pt-1">
+                        <li class="flex items-start gap-2"><svg class="w-3.5 h-3.5 text-green-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>Font Arial chống nhòe từ xa.</li>
+                        <li class="flex items-start gap-2"><svg class="w-3.5 h-3.5 text-green-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>Tiêu đề 40pt, Nội dung 28pt.</li>
+                        <li class="flex items-start gap-2"><svg class="w-3.5 h-3.5 text-green-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>Số trang tự động góc phải footer.</li>
+                        <li class="flex items-start gap-2"><svg class="w-3.5 h-3.5 text-amber-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>Hiệu ứng Appear: thêm thủ công trong PowerPoint.</li>
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Modal: Trợ lý Sinh Prompt — PHIÊN BẢN ĐẦY ĐỦ -->
+    <style>
+        .ptype-card { cursor:pointer; border:2px solid #e5e7eb; border-radius:10px; padding:8px 6px; text-align:center; transition:all .15s; background:#fff; user-select:none; }
+        .ptype-card:hover { border-color:#a78bfa; background:#faf5ff; }
+        .ptype-card.selected { border-color:#7c3aed; background:#ede9fe; }
+        .ptype-card .pt-icon { font-size:20px; display:block; margin-bottom:3px; }
+        .ptype-card .pt-label { font-size:11px; font-weight:600; color:#4b5563; line-height:1.3; }
+        .ptype-card.selected .pt-label { color:#6d28d9; }
+        .pmethod-item { display:flex; align-items:flex-start; gap:8px; padding:7px 9px; border:1.5px solid #e5e7eb; border-radius:8px; cursor:pointer; transition:all .15s; }
+        .pmethod-item:hover { border-color:#a78bfa; background:#faf5ff; }
+        .pmethod-item input:checked ~ span { color:#6d28d9; font-weight:600; }
+        .bloom-btn { padding:4px 10px; border-radius:20px; font-size:11px; font-weight:600; cursor:pointer; border:1.5px solid #e5e7eb; background:#f9fafb; color:#6b7280; transition:all .15s; }
+        .bloom-btn.active { border-color:#7c3aed; background:#ede9fe; color:#6d28d9; }
+        .popt-item { display:flex; align-items:center; gap:7px; padding:6px 9px; border:1.5px solid #e5e7eb; border-radius:8px; cursor:pointer; transition:all .15s; font-size:12px; }
+        .popt-item:hover { border-color:#a78bfa; background:#faf5ff; }
+        .popt-item input { accent-color:#7c3aed; width:14px; height:14px; flex-shrink:0; }
+    </style>
+    <div id="promptModal" class="fixed inset-0 bg-gray-900 bg-opacity-60 z-50 hidden flex items-center justify-center backdrop-blur-sm p-3">
+        <div class="bg-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden transform scale-95 opacity-0 transition-all duration-200 flex flex-col" id="promptModalContent" style="max-height:93vh;">
+
+            <!-- ── Header ── -->
+            <div class="flex-shrink-0 px-6 py-3.5 flex justify-between items-center" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);">
+                <div>
+                    <h3 class="text-white text-base font-bold flex items-center gap-2">
+                        ⚡ Trợ lý AI — Sinh Prompt Soạn Bài Sư Phạm
+                    </h3>
+                    <p class="text-purple-200 text-xs mt-0.5">Điền thông tin → Copy Prompt → Dán vào ChatGPT / Gemini / Claude</p>
+                </div>
+                <button onclick="closePromptModal()" class="text-purple-200 hover:text-white transition ml-4 flex-shrink-0">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- ── Scrollable Body ── -->
+            <div class="overflow-y-auto custom-scrollbar flex-1 px-5 py-4 space-y-4">
+
+                <!-- ROW 1: Môn / Lớp / Chủ đề / Số lượng -->
+                <div class="grid grid-cols-4 gap-3">
+                    <div class="col-span-2">
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">📖 Tên chủ đề / Bài học</label>
+                        <input type="text" id="pTopic" placeholder="VD: Phương trình bậc hai một ẩn..." class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">🏫 Môn học</label>
+                        <input type="text" id="pSubject" value="Toán học" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">🎓 Lớp / Cấp</label>
+                        <select id="pGrade" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none">
+                            <option value="">— Chọn lớp —</option>
+                            <optgroup label="THCS">
+                                <option>Lớp 6</option><option>Lớp 7</option><option>Lớp 8</option><option>Lớp 9</option>
+                            </optgroup>
+                            <optgroup label="THPT">
+                                <option>Lớp 10</option><option selected>Lớp 11</option><option>Lớp 12</option>
+                            </optgroup>
+                            <optgroup label="Khác">
+                                <option>Đại học</option><option>Bồi dưỡng</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-4 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">🔢 Số slide / câu</label>
+                        <input type="number" id="pCount" min="1" max="30" value="6" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">⏱ Thời lượng</label>
+                        <select id="pDuration" class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none">
+                            <option value="">— Tùy —</option>
+                            <option>15 phút</option><option>20 phút</option>
+                            <option selected>45 phút</option><option>90 phút</option>
+                        </select>
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">📝 Ghi chú / Yêu cầu đặc biệt</label>
+                        <input type="text" id="pNotes" placeholder="VD: Tập trung dạng hay sai, liên hệ thực tiễn đời sống..." class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- SECTION 2: Loại nội dung -->
+                <div>
+                    <div class="text-xs font-bold text-gray-700 mb-2 flex items-center gap-1.5">
+                        🎯 Loại nội dung cần tạo <span class="text-gray-400 font-normal">(chọn một)</span>
+                    </div>
+                    <div class="grid grid-cols-4 gap-2" id="pTypeCards">
+                        <div class="ptype-card selected" data-type="theory" onclick="selectPType(this)">
+                            <span class="pt-icon">📚</span><span class="pt-label">Lý thuyết<br>Kiến thức mới</span>
+                        </div>
+                        <div class="ptype-card" data-type="cover" onclick="selectPType(this)">
+                            <span class="pt-icon">🏫</span><span class="pt-label">Slide Bìa<br>+ Mục tiêu</span>
+                        </div>
+                        <div class="ptype-card" data-type="warmup" onclick="selectPType(this)">
+                            <span class="pt-icon">🔥</span><span class="pt-label">Khởi động<br>Kết nối</span>
+                        </div>
+                        <div class="ptype-card" data-type="compare" onclick="selectPType(this)">
+                            <span class="pt-icon">⚖️</span><span class="pt-label">So sánh<br>Bảng đối chiếu</span>
+                        </div>
+                        <div class="ptype-card" data-type="practice" onclick="selectPType(this)">
+                            <span class="pt-icon">✏️</span><span class="pt-label">Luyện tập<br>Vận dụng</span>
+                        </div>
+                        <div class="ptype-card" data-type="quiz" onclick="selectPType(this)">
+                            <span class="pt-icon">❓</span><span class="pt-label">Trắc nghiệm<br>4 đáp án</span>
+                        </div>
+                        <div class="ptype-card" data-type="exam" onclick="selectPType(this)">
+                            <span class="pt-icon">🏆</span><span class="pt-label">Dạng thi<br>Luyện thi</span>
+                        </div>
+                        <div class="ptype-card" data-type="summary" onclick="selectPType(this)">
+                            <span class="pt-icon">📋</span><span class="pt-label">Củng cố<br>Tổng kết</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 3: Phương pháp sư phạm -->
+                <div>
+                    <div class="text-xs font-bold text-gray-700 mb-2 flex items-center gap-1.5">
+                        🧠 Phương pháp dạy học tích cực <span class="text-gray-400 font-normal">(chọn một hoặc nhiều)</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <label class="pmethod-item">
+                            <input type="checkbox" class="pmethod-check w-4 h-4 flex-shrink-0 mt-0.5 accent-violet-600" data-method="socratic" checked>
+                            <span class="text-xs text-gray-700">💡 <strong>Câu hỏi gợi mở</strong><br><span class="text-gray-400">Mỗi slide có 1 câu hỏi dẫn dắt tư duy</span></span>
+                        </label>
+                        <label class="pmethod-item">
+                            <input type="checkbox" class="pmethod-check w-4 h-4 flex-shrink-0 mt-0.5 accent-violet-600" data-method="example" checked>
+                            <span class="text-xs text-gray-700">🌍 <strong>Ví dụ thực tiễn</strong><br><span class="text-gray-400">Liên hệ đời sống, tình huống thực</span></span>
+                        </label>
+                        <label class="pmethod-item">
+                            <input type="checkbox" class="pmethod-check w-4 h-4 flex-shrink-0 mt-0.5 accent-violet-600" data-method="mistake">
+                            <span class="text-xs text-gray-700">🚨 <strong>Sai lầm phổ biến</strong><br><span class="text-gray-400">Chỉ ra lỗi hay gặp + cách khắc phục</span></span>
+                        </label>
+                        <label class="pmethod-item">
+                            <input type="checkbox" class="pmethod-check w-4 h-4 flex-shrink-0 mt-0.5 accent-violet-600" data-method="stepbystep">
+                            <span class="text-xs text-gray-700">🪜 <strong>Từng bước rõ ràng</strong><br><span class="text-gray-400">Giải quyết vấn đề theo quy trình</span></span>
+                        </label>
+                        <label class="pmethod-item">
+                            <input type="checkbox" class="pmethod-check w-4 h-4 flex-shrink-0 mt-0.5 accent-violet-600" data-method="mindmap">
+                            <span class="text-xs text-gray-700">🗺️ <strong>Sơ đồ / Bảng tổng hợp</strong><br><span class="text-gray-400">Bảng Markdown so sánh, hệ thống hóa</span></span>
+                        </label>
+                        <label class="pmethod-item">
+                            <input type="checkbox" class="pmethod-check w-4 h-4 flex-shrink-0 mt-0.5 accent-violet-600" data-method="challenge">
+                            <span class="text-xs text-gray-700">🏅 <strong>Thách thức mở rộng</strong><br><span class="text-gray-400">Câu hỏi nâng cao, tư duy phản biện</span></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- SECTION 4: Mức độ Bloom -->
+                <div>
+                    <div class="text-xs font-bold text-gray-700 mb-2">📊 Mức độ nhận thức mục tiêu (Thang Bloom)</div>
+                    <div class="flex flex-wrap gap-2" id="bloomBtns">
+                        <button class="bloom-btn" data-bloom="nhanBiet" onclick="selectBloom(this)">🔵 Nhận biết</button>
+                        <button class="bloom-btn active" data-bloom="thonghieu" onclick="selectBloom(this)">🟢 Thông hiểu</button>
+                        <button class="bloom-btn" data-bloom="vandung" onclick="selectBloom(this)">🟡 Vận dụng</button>
+                        <button class="bloom-btn" data-bloom="phanTich" onclick="selectBloom(this)">🟠 Phân tích</button>
+                        <button class="bloom-btn" data-bloom="danhGia" onclick="selectBloom(this)">🔴 Đánh giá</button>
+                        <button class="bloom-btn" data-bloom="sangTao" onclick="selectBloom(this)">🟣 Sáng tạo</button>
+                    </div>
+                </div>
+
+                <!-- SECTION 5: Tùy chọn nội dung -->
+                <div>
+                    <div class="text-xs font-bold text-gray-700 mb-2">⚙️ Tùy chọn nội dung bổ sung</div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="popt-item">
+                            <input type="checkbox" id="pOptTable" class="accent-violet-600"> <span><strong>Bảng Markdown</strong> — so sánh / tổng hợp <code class="bg-gray-100 px-1 rounded text-purple-600 text-xs">| A | B |</code></span>
+                        </label>
+                        <label class="popt-item">
+                            <input type="checkbox" id="pOptQuestion" checked class="accent-violet-600"> <span><strong>Câu hỏi tương tác</strong> ❓ cuối mỗi slide</span>
+                        </label>
+                        <label class="popt-item">
+                            <input type="checkbox" id="pOptTrick" class="accent-violet-600"> <span><strong>Mẹo ghi nhớ</strong> 💡 / Tip thông minh</span>
+                        </label>
+                        <label class="popt-item">
+                            <input type="checkbox" id="pOptExample" checked class="accent-violet-600"> <span><strong>Ví dụ cụ thể</strong> / Tình huống thực tiễn</span>
+                        </label>
+                        <label class="popt-item">
+                            <input type="checkbox" id="pOptCover" class="accent-violet-600"> <span><strong>Thêm slide bìa</strong> mở đầu (# tiêu đề + ## phụ đề)</span>
+                        </label>
+                        <label class="popt-item">
+                            <input type="checkbox" id="pOptSummaryEnd" class="accent-violet-600"> <span><strong>Slide tổng kết</strong> cuối bài + Slide Dặn dò</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- RESULT -->
+                <div>
+                    <div class="flex justify-between items-center mb-1.5">
+                        <label class="text-xs font-bold text-purple-700">📋 Prompt được tạo — Sao chép và dán vào AI:</label>
+                        <button onclick="generatePromptText()" class="text-xs font-semibold text-purple-600 hover:text-purple-800 underline flex items-center gap-1">
+                            🔄 Làm mới Prompt
+                        </button>
+                    </div>
+                    <textarea id="pResult" readonly class="w-full p-3 bg-gray-50 border border-purple-200 rounded-lg text-xs text-gray-700 resize-none focus:outline-none custom-scrollbar shadow-inner font-mono leading-relaxed" style="height:180px;"></textarea>
+                </div>
+
+            </div><!-- end scrollable body -->
+
+            <!-- ── Footer ── -->
+            <div class="flex-shrink-0 bg-gray-50 px-5 py-3 flex justify-between items-center border-t border-gray-200">
+                <span class="text-xs text-gray-400">💬 Dán vào <strong>ChatGPT / Gemini / Claude</strong> — nhận Markdown → paste vào ô soạn thảo</span>
+                <div class="flex gap-2">
+                    <button onclick="closePromptModal()" class="px-4 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition text-sm">Đóng</button>
+                    <button onclick="copyPrompt()" class="px-5 py-1.5 rounded-lg text-white font-semibold hover:opacity-90 transition flex items-center gap-2 shadow text-sm" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                        Copy Prompt
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Toast Notification -->
+    <div id="toastContainer" class="fixed bottom-6 right-6 z-50 hidden flex-col gap-3"></div>
+
+    <script>
+        let activeTab = 'basic';
+
+        // =====================================================
+        // SMART FONT SIZE — globals declared first (TDZ guard)
+        // =====================================================
+        var currentFsMode = 'auto';
+
+        var FS_PRESETS = {
+            auto:   { title:40, subtitle:26, body:28, table:20, maxLines:'4–5',  desc:'Tối ưu cho 4–5 dòng nội dung mỗi slide'   },
+            large:  { title:44, subtitle:30, body:30, table:22, maxLines:'1–3',  desc:'Tối ưu cho 1–3 dòng nội dung mỗi slide'   },
+            medium: { title:40, subtitle:26, body:26, table:20, maxLines:'4–5',  desc:'Tối ưu cho 4–5 dòng nội dung mỗi slide'   },
+            small:  { title:34, subtitle:22, body:22, table:18, maxLines:'6–7',  desc:'Tối ưu cho 6–7 dòng nội dung mỗi slide'   },
+            custom: { title:40, subtitle:26, body:28, table:20, maxLines:'—',    desc:'Kích thước do bạn tùy chỉnh'               },
+        };
+
+        // =====================================================
+        // ACCORDION — toggle open/close
+        // =====================================================
+        function toggleAcc(id) {
+            const header = document.querySelector(`[onclick="toggleAcc('${id}')"]`);
+            const body   = document.getElementById(id + '-body');
+            const chev   = document.getElementById(id + '-chev');
+            const isOpen = body.classList.contains('open');
+            body.classList.toggle('open', !isOpen);
+            header.classList.toggle('open', !isOpen);
+            // chevron: open = rotate 90°, closed = 0°
+            if (chev) chev.style.transform = !isOpen ? 'rotate(90deg)' : 'rotate(0deg)';
+        }
+
+        // Cập nhật badge tên theme trên header accordion
+        function updateThemeBadge(name) {
+            const badge = document.getElementById('theme-badge');
+            if (badge) badge.textContent = name;
+        }
+
+        // =====================================================
+        // THEME DEFINITIONS — dùng chung cho PPTX và Preview
+        // =====================================================
+        const THEMES = {
+            light: { bg:"#FFFFFF", footerBg:"#F3F4F6", footerText:"#9CA3AF", title:"#1E3A8A", text:"#374151", badgeBg:"#4F46E5", badgeText:"#FFFFFF", solBg:"#E8F5E9", solText:"#1B5E20", solBorder:"#4CAF50" },
+            dark:  { bg:"#1F2937", footerBg:"#374151", footerText:"#9CA3AF", title:"#60A5FA", text:"#F3F4F6", badgeBg:"#3B82F6", badgeText:"#FFFFFF", solBg:"#374151", solText:"#A7F3D0", solBorder:"#059669" },
+            brand: { bg:"#0F172A", footerBg:"#1E293B", footerText:"#64748B", title:"#FBBF24", text:"#E2E8F0", badgeBg:"#F59E0B", badgeText:"#0F172A", solBg:"#1E293B", solText:"#6EE7B7", solBorder:"#10B981" },
+            paper: { bg:"#FDFBF7", footerBg:"#F3EFE6", footerText:"#8B7355", title:"#8B5A2B", text:"#4A4A4A", badgeBg:"#D2B48C", badgeText:"#FFFFFF", solBg:"#F3EFE6", solText:"#5C3D11", solBorder:"#C4A265" },
+            blue:  { bg:"#F0F9FF", footerBg:"#E0F2FE", footerText:"#0284C7", title:"#0369A1", text:"#0F172A", badgeBg:"#0EA5E9", badgeText:"#FFFFFF", solBg:"#E0F2FE", solText:"#0369A1", solBorder:"#38BDF8" },
+            pink:  { bg:"#FDF2F8", footerBg:"#FCE7F3", footerText:"#DB2777", title:"#BE185D", text:"#4A044E", badgeBg:"#E11D48", badgeText:"#FFFFFF", solBg:"#FCE7F3", solText:"#831843", solBorder:"#F472B6" },
+            custom:{ bg:"#FFFFFF", footerBg:"#F3F4F6", footerText:"#9CA3AF", title:"#1E3A8A", text:"#374151", badgeBg:"#4F46E5", badgeText:"#FFFFFF", solBg:"#E8F5E9", solText:"#1B5E20", solBorder:"#4CAF50" }
+        };
+
+        // ── Custom theme color picker ──
+        function getLuminance(hex) {
+            const r = parseInt(hex.slice(1,3),16)/255;
+            const g = parseInt(hex.slice(3,5),16)/255;
+            const b = parseInt(hex.slice(5,7),16)/255;
+            return 0.299*r + 0.587*g + 0.114*b;
+        }
+        function updateCustomTheme() {
+            const bg         = document.getElementById('cpBg').value;
+            const title      = document.getElementById('cpTitle').value;
+            const text       = document.getElementById('cpText').value;
+            const accent     = document.getElementById('cpAccent').value;
+            const footerBg   = document.getElementById('cpFooterBg').value;
+            const footerText = document.getElementById('cpFooterText').value;
+            const badgeText  = getLuminance(accent) > 0.55 ? '#1F2937' : '#FFFFFF';
+            THEMES.custom = {
+                bg, footerBg, footerText, title, text,
+                badgeBg: accent, badgeText,
+                solBg: footerBg, solText: text, solBorder: accent
+            };
+            const swatch = document.getElementById('customThemeSwatch');
+            if (swatch) { swatch.style.background = bg; swatch.style.borderColor = accent; }
+            // Auto-select custom radio
+            const radio = document.getElementById('radioCustomTheme');
+            if (radio && !radio.checked) { radio.checked = true; updateThemeBadge('Tùy chỉnh'); }
+            if (activeTab === 'preview') renderPreview();
+            debouncedSave();
+        }
+
+        // =====================================================
+        // UTILITY
+        // =====================================================
+        function sanitizeFileName(name) {
+            return name
+                .normalize('NFD').replace(/[̀-ͯ]/g, '')
+                .replace(/đ/gi, 'd')
+                .replace(/[^a-zA-Z0-9_\-]/g, '_')
+                .replace(/_+/g, '_')
+                .replace(/^_|_$/g, '')
+                .substring(0, 60);
+        }
+
+        function debounce(fn, delay) {
+            let timer;
+            return function(...args) { clearTimeout(timer); timer = setTimeout(() => fn(...args), delay); };
+        }
+
+        // Làm sạch markdown markers
+        const stripMarkdown = (txt) =>
+            txt.replace(/\*\*/g, '')
+               .replace(/^\*+\s*/, '')
+               .replace(/\*+$/, '')
+               .replace(/^_+|_+$/g, '')
+               .trim();
+
+        // =====================================================
+        // SLIDE COUNTER
+        // =====================================================
+        function updateSlideCounter() {
+            const textarea = activeTab === 'basic' || activeTab === 'preview'
+                ? document.getElementById('markdownInput')
+                : document.getElementById('quizInput');
+            const text = textarea.value.trim();
+            if (!text) { document.getElementById('slideCounter').textContent = '0 slide'; return; }
+            const count = text.split(/^---$/m).filter(s => s.trim() !== '').length;
+            document.getElementById('slideCounter').textContent = count + ' slide';
+        }
+
+        // =====================================================
+        // SHARED PARSER — dùng cho cả Preview và PPTX
+        // =====================================================
+
+        /** Parse Markdown table lines → rows array (header + data, no separator) */
+        function parseMarkdownTable(tableLines) {
+            return tableLines
+                .filter(l => !/^\|[\s\|\-:]+\|?\s*$/.test(l)) // bỏ dòng |---|---|
+                .map(l => l.trim().replace(/^\||\|$/g,'').split('|').map(c => c.trim()));
+        }
+
+        /**
+         * Parse một block text của Basic slide
+         * → { titleText, subtitleText, bodyBullets, bodyBlocks, isCover, imageBlock }
+         * bodyBlocks: [{type:'bullet',text}|{type:'table',rows:[[]]}]
+         * imageBlock: null | { url: string|null }
+         *   dòng `![img](dataUrl)` hoặc `![img]` → tách slide đôi trái/phải
+         */
+        function parseBasicSlide(content) {
+            const lines = content.split('\n');
+            let titleText = '', subtitleText = '';
+            let bodyBullets = [];
+            let bodyBlocks  = [];
+            let tableBuffer = [];
+            let imageBlock  = null;                        // ảnh đính kèm (nếu có)
+
+            // Regex nhận diện marker ảnh: ![img] hoặc ![img](url)
+            const IMG_RE = /^!\[img\](?:\(([^)]*)\))?$/i;
+
+            function flushTable() {
+                if (tableBuffer.length >= 2) {
+                    const rows = parseMarkdownTable(tableBuffer);
+                    if (rows.length > 0) bodyBlocks.push({ type: 'table', rows });
+                }
+                tableBuffer = [];
+            }
+
+            lines.forEach(line => {
+                const t = line.trim();
+                if (!t) { flushTable(); return; }
+
+                // Kiểm tra marker ảnh trước
+                const imgMatch = t.match(IMG_RE);
+                if (imgMatch) {
+                    flushTable();
+                    imageBlock = { url: imgMatch[1] || null };
+                    return;
+                }
+
+                if (t.startsWith('## ') || t === '##') {
+                    flushTable(); subtitleText = t.replace(/^##\s*/,'');
+                } else if (t.startsWith('#')) {
+                    flushTable(); titleText = t.replace(/^#+\s*/,'');
+                } else if (t.startsWith('|')) {
+                    tableBuffer.push(t);
+                } else if (t.startsWith('-')) {
+                    flushTable();
+                    const b = t.replace(/^-\s*/,'');
+                    bodyBullets.push(b);
+                    bodyBlocks.push({ type:'bullet', text:b });
+                } else {
+                    flushTable();
+                    bodyBullets.push(t);
+                    bodyBlocks.push({ type:'bullet', text:t });
+                }
+            });
+            flushTable();
+
+            const hasBulletsOrTables = bodyBullets.length > 0 || bodyBlocks.some(b=>b.type==='table');
+            const isCover = (titleText !== '' && !hasBulletsOrTables && !imageBlock);
+            return { titleText, subtitleText, bodyBullets, bodyBlocks, isCover, imageBlock };
+        }
+
+        /** Parse một block text của Quiz slide → { questionText, options, solution, isTitleOnly } */
+        function parseQuizSlide(content) {
+            const lines = content.split('\n');
+            let questionLines = [], options = [], solution = [];
+            let phase = 'question';
+
+            lines.forEach(line => {
+                const raw = line.trim();
+                if (!raw) return;
+                const clean = stripMarkdown(raw);
+                if (!clean) return;
+
+                const optMatch = clean.match(/^([A-D])\.\s*(.*)$/);
+                if (optMatch) {
+                    phase = 'options';
+                    options.push({ letter: optMatch[1], text: optMatch[2] });
+                    return;
+                }
+                if (/lời giải/i.test(clean)) { phase = 'solution'; return; }
+
+                if (phase === 'question') questionLines.push(clean);
+                else if (phase === 'options' && options.length > 0) options[options.length - 1].text += ' ' + clean;
+                else if (phase === 'solution') solution.push(clean);
+            });
+
+            return {
+                questionText: questionLines.join('\n'),
+                options, solution,
+                isTitleOnly: options.length === 0
+            };
+        }
+
+        // =====================================================
+        // PREVIEW ENGINE
+        // =====================================================
+        function renderPreview() {
+            const grid = document.getElementById('previewGrid');
+            const selectedTheme = document.querySelector('input[name="themeMode"]:checked').value;
+            const theme = THEMES[selectedTheme];
+            const footerText = document.getElementById('footerInput').value.trim();
+
+            // Lấy nội dung từ tab đang active (basic hoặc quiz)
+            const currentMode = (activeTab === 'preview') ? _lastContentTab : activeTab;
+            const rawText = currentMode === 'basic'
+                ? document.getElementById('markdownInput').value.trim()
+                : document.getElementById('quizInput').value.trim();
+
+            if (!rawText) {
+                grid.innerHTML = `<div class="preview-empty col-span-2">
+                    <svg class="w-12 h-12 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    <p class="text-sm font-medium">Chưa có nội dung để xem trước</p>
+                    <p class="text-xs opacity-60">Hãy soạn thảo ở tab Cơ bản hoặc Trắc nghiệm</p>
+                </div>`;
+                return;
+            }
+
+            const slidesData = rawText.split(/^---$/m).filter(s => s.trim() !== '');
+            const total = slidesData.length;
+            let html = '';
+
+            slidesData.forEach((content, idx) => {
+                const slideNum = idx + 1;
+                let cardBody = '';
+
+                if (currentMode === 'quiz') {
+                    const { questionText, options, solution, isTitleOnly } = parseQuizSlide(content);
+
+                    if (isTitleOnly) {
+                        // Slide tiêu đề / intro
+                        cardBody = `
+                            <div class="slide-content-area" style="display:flex;align-items:center;justify-content:center;">
+                                <div class="slide-title" style="color:${theme.title};font-size:5cqw;text-align:center;">${escHtml(questionText)}</div>
+                            </div>`;
+                    } else {
+                        const optRows = options.map(o => `
+                            <div class="quiz-option-row">
+                                <div class="quiz-badge" style="background:${theme.badgeBg};color:${theme.badgeText};">${escHtml(o.letter)}</div>
+                                <div style="color:${theme.text};font-size:2.5cqw;line-height:1.3;flex:1;">${escHtml(o.text)}</div>
+                            </div>`).join('');
+
+                        const solBox = solution.length > 0 ? `
+                            <div class="quiz-sol-box" style="background:${theme.solBg};border:1px solid ${theme.solBorder};color:${theme.solText};">
+                                <strong>Lời giải:</strong> ${escHtml(solution.join(' '))}
+                            </div>` : '';
+
+                        cardBody = `
+                            <div class="slide-content-area">
+                                <div class="slide-title" style="color:${theme.title};font-size:3cqw;margin-bottom:2%;">${escHtml(questionText)}</div>
+                                ${optRows}
+                                ${solBox}
+                            </div>`;
+                    }
+                } else {
+                    const { titleText, subtitleText, bodyBullets, isCover } = parseBasicSlide(content);
+
+                    if (isCover) {
+                        // ── SLIDE BÌA ──
+                        const schoolText = document.getElementById('schoolInput').value.trim();
+                        cardBody = `
+                            <div class="slide-content-area" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4% 8%;">
+                                <div style="width:6cqw;height:3px;background:${theme.badgeBg};border-radius:2px;margin-bottom:4%;"></div>
+                                <div style="color:${theme.title};font-size:5cqw;font-weight:700;line-height:1.2;margin-bottom:2.5%;">${escHtml(titleText)}</div>
+                                ${subtitleText ? `<div style="color:${theme.text};font-size:2.8cqw;font-style:italic;margin-bottom:2.5%;opacity:0.85;">${escHtml(subtitleText)}</div>` : ''}
+                                <div style="width:4cqw;height:2px;background:${theme.badgeBg};opacity:0.4;border-radius:2px;margin-bottom:2.5%;"></div>
+                                ${schoolText ? `<div style="color:${theme.footerText};font-size:2.2cqw;">${escHtml(schoolText)}</div>` : ''}
+                            </div>`;
+                    } else {
+                        const contentHtml = bodyBlocks.map(block => {
+                            if (block.type === 'bullet') {
+                                return `<div class="slide-bullet">
+                                    <div class="slide-bullet-dot" style="background:${theme.badgeBg};"></div>
+                                    <div style="color:${theme.text};font-size:2.5cqw;flex:1;">${escHtml(block.text)}</div>
+                                </div>`;
+                            } else if (block.type === 'table') {
+                                const hdr = (block.rows[0]||[]).map(c =>
+                                    `<th class="slide-table-th" style="background:${theme.badgeBg};color:${theme.badgeText};">${escHtml(c)}</th>`
+                                ).join('');
+                                const body = block.rows.slice(1).map((row,ri) =>
+                                    `<tr style="background:${ri%2===0?theme.bg:theme.footerBg};">` +
+                                    row.map(c=>`<td class="slide-table-td" style="color:${theme.text};">${escHtml(c)}</td>`).join('') +
+                                    `</tr>`
+                                ).join('');
+                                return `<div style="margin-bottom:2%;">
+                                    <table class="slide-table">
+                                        ${hdr ? `<thead><tr>${hdr}</tr></thead>` : ''}
+                                        <tbody>${body}</tbody>
+                                    </table>
+                                </div>`;
+                            }
+                            return '';
+                        }).join('');
+
+                        cardBody = `
+                            <div class="slide-content-area">
+                                ${titleText ? `<div class="slide-title" style="color:${theme.title};font-size:3.8cqw;">${escHtml(titleText)}</div>` : ''}
+                                ${subtitleText ? `<div style="color:${theme.text};font-size:2.5cqw;font-style:italic;margin-bottom:2%;opacity:0.8;">${escHtml(subtitleText)}</div>` : ''}
+                                ${contentHtml}
+                            </div>`;
+                    }
+                }
+
+                html += `
+                <div class="slide-card-wrap">
+                    <div class="slide-num-badge">${slideNum} / ${total}</div>
+                    <div class="slide-card-inner" style="background:${theme.bg};">
+                        ${cardBody}
+                        <div class="slide-footer-bar" style="background:${theme.footerBg};">
+                            <span style="color:${theme.footerText};font-size:1.6cqw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80%;">${escHtml(footerText)}</span>
+                            <span style="color:${theme.footerText};font-size:1.6cqw;font-weight:700;flex-shrink:0;">${slideNum}</span>
+                        </div>
+                    </div>
+                </div>`;
+            });
+
+            grid.innerHTML = html;
+        }
+
+        // Escape HTML để tránh XSS trong preview
+        function escHtml(str) {
+            return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        // Debounced version của renderPreview (500ms)
+        const debouncedPreview = debounce(renderPreview, 500);
+
+        // Lưu tab content cuối trước khi chuyển sang preview
+        let _lastContentTab = 'basic';
+
+        // =====================================================
+        // TAB SWITCHING
+        // =====================================================
+        function switchTab(tabId) {
+            if (tabId !== 'preview') _lastContentTab = tabId;
+            activeTab = tabId;
+
+            const btnBasic   = document.getElementById('tab-basic');
+            const btnQuiz    = document.getElementById('tab-quiz');
+            const btnPreview = document.getElementById('tab-preview');
+            const txtBasic   = document.getElementById('markdownInput');
+            const txtQuiz    = document.getElementById('quizInput');
+            const previewPanel = document.getElementById('previewPanel');
+
+            const activeCls  = "text-sm font-semibold text-indigo-700 uppercase tracking-wider pb-1 border-b-2 border-indigo-700 transition-colors";
+            const activeGreenCls = "text-sm font-semibold text-emerald-700 uppercase tracking-wider pb-1 border-b-2 border-emerald-600 transition-colors flex items-center gap-1.5";
+            const inactiveCls = "text-sm font-semibold text-gray-500 uppercase tracking-wider pb-1 border-b-2 border-transparent hover:text-indigo-600 transition-colors";
+            const inactiveGreenCls = "text-sm font-semibold text-gray-500 uppercase tracking-wider pb-1 border-b-2 border-transparent hover:text-emerald-600 transition-colors flex items-center gap-1.5";
+
+            // Reset tất cả
+            btnBasic.className   = inactiveCls;
+            btnQuiz.className    = inactiveCls;
+            btnPreview.className = inactiveGreenCls;
+            txtBasic.classList.add('hidden');    txtBasic.classList.remove('block');
+            txtQuiz.classList.add('hidden');     txtQuiz.classList.remove('block');
+            previewPanel.classList.add('hidden');
+
+            // Toolbar visibility
+            const toolbar     = document.getElementById('editorToolbar');
+            const tbBasic     = document.getElementById('toolbarBasic');
+            const tbQuiz      = document.getElementById('toolbarQuiz');
+            const frPanel     = document.getElementById('findReplacePanel');
+
+            if (tabId === 'basic') {
+                btnBasic.className = activeCls;
+                txtBasic.classList.remove('hidden'); txtBasic.classList.add('block');
+                toolbar.classList.remove('hidden');
+                tbBasic.classList.remove('hidden');
+                tbQuiz.classList.add('hidden');
+            } else if (tabId === 'quiz') {
+                btnQuiz.className = activeCls;
+                txtQuiz.classList.remove('hidden'); txtQuiz.classList.add('block');
+                toolbar.classList.remove('hidden');
+                tbBasic.classList.add('hidden');
+                tbQuiz.classList.remove('hidden');
+            } else { // preview
+                btnPreview.className = activeGreenCls;
+                previewPanel.classList.remove('hidden');
+                toolbar.classList.add('hidden');
+                frPanel.classList.add('hidden'); // đóng Find&Replace khi xem preview
+                renderPreview(); // Render ngay khi switch
+            }
+
+            updateSlideCounter();
+        }
+
+        // =====================================================
+        // WIRING: auto-update preview + counter khi gõ / đổi theme
+        // =====================================================
+        const markdownInput = document.getElementById('markdownInput');
+        const quizInput     = document.getElementById('quizInput');
+
+        markdownInput.addEventListener('input', () => {
+            updateSlideCounter();
+            if (activeTab === 'preview') debouncedPreview();
+            else debouncedPreview(); // render nền để sẵn sàng
+        });
+        quizInput.addEventListener('input', () => {
+            updateSlideCounter();
+            if (activeTab === 'preview') debouncedPreview();
+            else debouncedPreview();
+        });
+
+        // Khi đổi theme → re-render preview ngay nếu đang xem
+        document.querySelectorAll('input[name="themeMode"]').forEach(r => {
+            r.addEventListener('change', () => { if (activeTab === 'preview') renderPreview(); });
+        });
+        document.getElementById('footerInput').addEventListener('input', () => {
+            if (activeTab === 'preview') debouncedPreview();
+        });
+        document.getElementById('spaceSavingMode').addEventListener('change', () => {
+            if (activeTab === 'preview') renderPreview();
+            debouncedSave();
+        });
+        document.getElementById('schoolInput').addEventListener('input', () => {
+            if (activeTab === 'preview') debouncedPreview();
+            debouncedSave();
+        });
+        // Wire auto-save to setting inputs
+        ['fileNameInput','footerInput','footerFont'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input',  debouncedSave);
+            if (el) el.addEventListener('change', debouncedSave);
+        });
+        document.querySelectorAll('input[name="themeMode"]').forEach(r => {
+            r.addEventListener('change', debouncedSave);
+        });
+        // Also save on textarea input (already hooked via markdownInput/quizInput listeners above)
+        markdownInput.addEventListener('input', debouncedSave);
+        quizInput.addEventListener('input',     debouncedSave);
+
+        // Khởi tạo: load từ localStorage trước, rồi đếm slide
+        loadFromLocalStorage();
+        updateSlideCounter();
+
+        // =====================================================
+        // CLEAR / RESET — double-click confirmation
+        // =====================================================
+        let _clearConfirmTimer = null;
+        function clearContent() {
+            const btn     = document.getElementById('clearBtn');
+            const btnText = document.getElementById('clearBtnText');
+
+            if (_clearConfirmTimer) {
+                // Lần nhấn thứ 2 trong 2.5s → thực sự xóa
+                clearTimeout(_clearConfirmTimer);
+                _clearConfirmTimer = null;
+                const textarea = (activeTab === 'quiz')
+                    ? document.getElementById('quizInput')
+                    : document.getElementById('markdownInput');
+                textarea.value = '';
+                textarea.dispatchEvent(new Event('input'));
+                // Reset trạng thái nút
+                btn.classList.remove('bg-orange-100', 'border-orange-400', 'text-orange-700');
+                btn.classList.add('bg-red-50', 'border-red-200', 'text-red-500');
+                btnText.textContent = 'Xóa hết';
+                showToast("Đã xóa toàn bộ nội dung.", "success");
+            } else {
+                // Lần nhấn đầu → chuyển sang trạng thái xác nhận
+                btnText.textContent = '⚠ Xóa hết?';
+                btn.classList.remove('bg-red-50', 'border-red-200', 'text-red-500');
+                btn.classList.add('bg-orange-100', 'border-orange-400', 'text-orange-700');
+                _clearConfirmTimer = setTimeout(() => {
+                    _clearConfirmTimer = null;
+                    btn.classList.remove('bg-orange-100', 'border-orange-400', 'text-orange-700');
+                    btn.classList.add('bg-red-50', 'border-red-200', 'text-red-500');
+                    btnText.textContent = 'Xóa hết';
+                }, 2500);
+            }
+        }
+
+        // =====================================================
+        // AUTO-SAVE — LocalStorage
+        // =====================================================
+        const LS_KEY = 'eduslide_v2';
+
+        function saveToLocalStorage() {
+            try {
+                const checkedTheme = document.querySelector('input[name="themeMode"]:checked');
+                const data = {
+                    basic:       document.getElementById('markdownInput').value,
+                    quiz:        document.getElementById('quizInput').value,
+                    fileName:    document.getElementById('fileNameInput').value,
+                    footer:      document.getElementById('footerInput').value,
+                    school:      document.getElementById('schoolInput').value,
+                    footerFont:  document.getElementById('footerFont').value,
+                    theme:       checkedTheme ? checkedTheme.value : 'light',
+                    spaceSaving: document.getElementById('spaceSavingMode').checked,
+                    customTheme: THEMES.custom,
+                    cpBg:        document.getElementById('cpBg').value,
+                    cpTitle:     document.getElementById('cpTitle').value,
+                    cpText:      document.getElementById('cpText').value,
+                    cpAccent:    document.getElementById('cpAccent').value,
+                    cpFooterBg:  document.getElementById('cpFooterBg').value,
+                    cpFooterText:document.getElementById('cpFooterText').value,
+                    savedAt:     new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})
+                };
+                localStorage.setItem(LS_KEY, JSON.stringify(data));
+                const ind = document.getElementById('saveIndicator');
+                if (ind) {
+                    ind.textContent = '✓ Đã lưu ' + data.savedAt;
+                    ind.style.opacity = '1';
+                    clearTimeout(ind._fadeTimer);
+                    ind._fadeTimer = setTimeout(() => { ind.style.opacity = '0'; }, 3000);
+                }
+            } catch(e) { /* quota exceeded – silently ignore */ }
+        }
+
+        function loadFromLocalStorage() {
+            try {
+                const raw = localStorage.getItem(LS_KEY);
+                if (!raw) return;
+                const d = JSON.parse(raw);
+                if (d.basic      !== undefined) document.getElementById('markdownInput').value = d.basic;
+                if (d.quiz       !== undefined) document.getElementById('quizInput').value     = d.quiz;
+                if (d.fileName)   document.getElementById('fileNameInput').value   = d.fileName;
+                if (d.footer)     document.getElementById('footerInput').value     = d.footer;
+                if (d.school     !== undefined) document.getElementById('schoolInput').value   = d.school;
+                if (d.footerFont) document.getElementById('footerFont').value     = d.footerFont;
+                if (d.spaceSaving !== undefined) document.getElementById('spaceSavingMode').checked = d.spaceSaving;
+                // Restore color pickers
+                if (d.cpBg)         { document.getElementById('cpBg').value         = d.cpBg; }
+                if (d.cpTitle)      { document.getElementById('cpTitle').value      = d.cpTitle; }
+                if (d.cpText)       { document.getElementById('cpText').value       = d.cpText; }
+                if (d.cpAccent)     { document.getElementById('cpAccent').value     = d.cpAccent; }
+                if (d.cpFooterBg)   { document.getElementById('cpFooterBg').value   = d.cpFooterBg; }
+                if (d.cpFooterText) { document.getElementById('cpFooterText').value = d.cpFooterText; }
+                if (d.customTheme)  { THEMES.custom = d.customTheme; }
+                // Restore theme radio
+                if (d.theme) {
+                    const radio = document.querySelector(`input[name="themeMode"][value="${d.theme}"]`);
+                    if (radio) { radio.checked = true; }
+                    const names = {light:'Trắng',dark:'Tối',brand:'Hoàng Gia',paper:'Giấy',blue:'Xanh',pink:'Hồng',custom:'Tùy chỉnh'};
+                    updateThemeBadge(names[d.theme] || d.theme);
+                }
+                updateSlideCounter();
+            } catch(e) { console.warn('Lỗi đọc localStorage', e); }
+        }
+
+        const debouncedSave = debounce(saveToLocalStorage, 1200);
+
+        // =====================================================
+        // EDITOR TOOLBAR — helpers
+        // =====================================================
+
+        /** Lấy textarea đang active */
+        function getActiveTextarea() {
+            return activeTab === 'quiz'
+                ? document.getElementById('quizInput')
+                : document.getElementById('markdownInput');
+        }
+
+        /** Chèn text tại vị trí con trỏ, thay thế selection nếu có */
+        function insertAtCursor(ta, text) {
+            const s = ta.selectionStart, e = ta.selectionEnd;
+            ta.value = ta.value.substring(0, s) + text + ta.value.substring(e);
+            ta.selectionStart = ta.selectionEnd = s + text.length;
+            ta.focus(); ta.dispatchEvent(new Event('input'));
+        }
+
+        // ── Chèn ảnh → slide tách đôi ──────────────────────────
+        function triggerImgUpload() {
+            document.getElementById('imgFileInput').click();
+        }
+        function onImgFileSelected(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            // Giới hạn 2MB để tránh PPTX quá nặng
+            if (file.size > 2 * 1024 * 1024) {
+                showToast('Ảnh quá lớn (> 2 MB). Hãy giảm kích thước trước.', 'error');
+                e.target.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                const dataUrl = ev.target.result;
+                const ta = document.getElementById('markdownInput');
+                // Chèn marker trên dòng riêng
+                const pos = ta.selectionStart;
+                const before = ta.value.substring(0, pos);
+                const needNL = before.length > 0 && !before.endsWith('\n') ? '\n' : '';
+                insertAtCursor(ta, needNL + `![img](${dataUrl})\n`);
+                showToast('Ảnh đã chèn — slide sẽ tự tách đôi khi xuất PPTX', 'success');
+            };
+            reader.readAsDataURL(file);
+            e.target.value = '';
+        }
+
+        /** Toggle prefix đầu dòng hiện tại (# / ## / -) */
+        function insertLinePrefix(taId, prefix) {
+            const ta = document.getElementById(taId);
+            const pos = ta.selectionStart;
+            const lineStart = ta.value.lastIndexOf('\n', pos - 1) + 1;
+            const lineEnd   = ta.value.indexOf('\n', pos);
+            const lineEnd2  = lineEnd === -1 ? ta.value.length : lineEnd;
+            const line      = ta.value.substring(lineStart, lineEnd2);
+
+            // Xóa prefix hiện tại (# / ## / -) rồi thêm prefix mới
+            const stripped = line.replace(/^(#{1,2}\s*|-\s*)/, '');
+            const alreadyHas = line.startsWith(prefix);
+            const newLine = alreadyHas ? stripped : prefix + stripped;
+
+            ta.value = ta.value.substring(0, lineStart) + newLine + ta.value.substring(lineEnd2);
+            const newCursorPos = lineStart + newLine.length;
+            ta.selectionStart = ta.selectionEnd = newCursorPos;
+            ta.focus(); ta.dispatchEvent(new Event('input'));
+        }
+
+        /** Bao selection bằng before / after */
+        function wrapSelection(taId, before, after) {
+            const ta = document.getElementById(taId);
+            const s = ta.selectionStart, e = ta.selectionEnd;
+            const sel = ta.value.substring(s, e) || 'văn bản';
+            const wrapped = before + sel + after;
+            ta.value = ta.value.substring(0, s) + wrapped + ta.value.substring(e);
+            ta.selectionStart = s + before.length;
+            ta.selectionEnd   = s + before.length + sel.length;
+            ta.focus(); ta.dispatchEvent(new Event('input'));
+        }
+
+        /** Chèn dấu ngắt slide --- (đảm bảo xuống dòng đúng) */
+        function insertSlideBreak(taId) {
+            const ta = document.getElementById(taId);
+            const pos = ta.selectionStart;
+            const before = ta.value.substring(0, pos);
+            const after  = ta.value.substring(pos);
+            const pre  = before.length > 0 && !before.endsWith('\n') ? '\n' : '';
+            const post = after.length  > 0 && !after.startsWith('\n') ? '\n' : '';
+            const ins  = pre + '---' + post;
+            ta.value = before + ins + after;
+            ta.selectionStart = ta.selectionEnd = pos + ins.length;
+            ta.focus(); ta.dispatchEvent(new Event('input'));
+        }
+
+        /** Chèn template slide bìa hoặc slide cơ bản */
+        function insertTemplate(type) {
+            const ta = document.getElementById('markdownInput');
+            const pos = ta.selectionStart;
+            const before = ta.value.substring(0, pos);
+            const after  = ta.value.substring(pos);
+            const sep = before.trim().length > 0 ? '\n---\n' : '';
+            let tmpl = '';
+            if (type === 'cover') {
+                tmpl = sep + '# Tiêu đề bài học\n## Subtitle — Ghi chú nhỏ\n';
+            } else {
+                tmpl = sep + '# Tiêu đề slide\n- Nội dung thứ nhất\n- Nội dung thứ hai\n- Nội dung thứ ba\n';
+            }
+            ta.value = before + tmpl + after;
+            // Đặt cursor ngay sau dấu # đầu tiên
+            const offset = tmpl.indexOf('# ') + 2;
+            ta.selectionStart = ta.selectionEnd = before.length + (sep.length) + (type === 'cover' ? 2 : 2);
+            ta.focus(); ta.dispatchEvent(new Event('input'));
+        }
+
+        /** Chèn template câu hỏi trắc nghiệm */
+        function insertQuizTemplate(type) {
+            const ta = document.getElementById('quizInput');
+            const pos = ta.selectionStart;
+            const before = ta.value.substring(0, pos);
+            const after  = ta.value.substring(pos);
+            const sep = before.trim().length > 0 ? '\n---\n' : '';
+            let tmpl = '';
+            if (type === 'title') {
+                tmpl = sep + '**TIÊU ĐỀ PHẦN TRẮC NGHIỆM**\n';
+            } else {
+                const num = (ta.value.match(/\*\*Câu\s+\d+:/g) || []).length + 1;
+                tmpl = sep +
+                    `**Câu ${num}:** Nội dung câu hỏi?\n` +
+                    'A. Đáp án A\nB. Đáp án B\nC. Đáp án C\nD. Đáp án D\n\n' +
+                    '**Lời giải chi tiết:**\n* **Chọn B.**\n* Lý do chọn B...\n';
+            }
+            ta.value = before + tmpl + after;
+            ta.selectionStart = ta.selectionEnd = before.length + tmpl.length;
+            ta.focus(); ta.dispatchEvent(new Event('input'));
+        }
+
+        // ── SYMBOL PICKER ──
+        const SYMBOLS = [
+            '²','³','¹','⁰','α','β','γ','δ','ε','θ','λ','μ','π','σ','φ','ω',
+            'Δ','Σ','∫','∂','∞','√','∛','∜','±','×','÷','≠','≈','≤','≥','≡',
+            '∈','∉','⊂','⊃','∩','∪','∀','∃','→','⇒','⟺','↔','⟹','⊥','∥','∠',
+            '°','′','″','½','¼','¾','…','—','–','«','»','"','"',
+        ];
+        let _symbolTargetId = 'markdownInput';
+
+        function insertSymbol(taId) {
+            _symbolTargetId = taId;
+            const picker = document.getElementById('symbolPicker');
+            // Build grid nếu chưa có
+            const grid = document.getElementById('symbolGrid');
+            if (!grid.children.length) {
+                grid.innerHTML = SYMBOLS.map(s =>
+                    `<button class="w-7 h-7 flex items-center justify-center border border-gray-200 rounded hover:bg-indigo-50 hover:border-indigo-300 text-sm font-mono cursor-pointer transition" onclick="pickSymbol('${s}')" title="${s}">${s}</button>`
+                ).join('');
+            }
+            // Định vị popup gần nút toolbar
+            const btn = event.currentTarget;
+            const rect = btn.getBoundingClientRect();
+            const parentRect = document.querySelector('#editorToolbar').closest('.flex-col').getBoundingClientRect();
+            picker.style.top  = (rect.bottom - parentRect.top + 4) + 'px';
+            picker.style.left = Math.min(rect.left - parentRect.left, parentRect.width - 288) + 'px';
+            picker.classList.toggle('hidden');
+        }
+
+        function pickSymbol(sym) {
+            const ta = document.getElementById(_symbolTargetId);
+            insertAtCursor(ta, sym);
+            document.getElementById('symbolPicker').classList.add('hidden');
+        }
+
+        /** Chèn template bảng Markdown */
+        function insertTableTemplate() {
+            const ta = document.getElementById('markdownInput');
+            const pos = ta.selectionStart;
+            const before = ta.value.substring(0, pos);
+            const after  = ta.value.substring(pos);
+            const sep = before.trim().length > 0 && !before.trim().endsWith('---') ? '\n' : '';
+            const tmpl = sep +
+                '| Cột 1 | Cột 2 | Cột 3 |\n' +
+                '|-------|-------|-------|\n' +
+                '| Dữ liệu A | Dữ liệu B | Dữ liệu C |\n' +
+                '| Dữ liệu D | Dữ liệu E | Dữ liệu F |\n';
+            ta.value = before + tmpl + after;
+            ta.selectionStart = ta.selectionEnd = before.length + tmpl.length;
+            ta.focus(); ta.dispatchEvent(new Event('input'));
+        }
+
+        // Đóng symbol picker khi click ngoài
+        document.addEventListener('click', e => {
+            const picker = document.getElementById('symbolPicker');
+            if (!picker.classList.contains('hidden') &&
+                !picker.contains(e.target) &&
+                !e.target.closest('[onclick*="insertSymbol"]')) {
+                picker.classList.add('hidden');
+            }
+        });
+
+        // ── FIND & REPLACE ──
+        let _findIndex = -1;
+
+        function toggleFindReplace() {
+            const panel = document.getElementById('findReplacePanel');
+            const btn   = document.getElementById('findReplaceBtn');
+            const isHidden = panel.classList.contains('hidden');
+            panel.classList.toggle('hidden', !isHidden);
+            btn.classList.toggle('active', isHidden);
+            if (isHidden) {
+                document.getElementById('findInput').focus();
+                _findIndex = -1;
+            } else {
+                document.getElementById('findStatus').textContent = '';
+            }
+        }
+
+        function findNext() {
+            const ta     = getActiveTextarea();
+            const query  = document.getElementById('findInput').value;
+            const status = document.getElementById('findStatus');
+            if (!query) { status.textContent = ''; return; }
+            const text = ta.value;
+            const from = _findIndex >= 0 ? _findIndex + 1 : 0;
+            let idx = text.indexOf(query, from);
+            if (idx === -1) idx = text.indexOf(query, 0); // vòng lại
+            if (idx === -1) { status.textContent = 'Không tìm thấy.'; _findIndex = -1; return; }
+            _findIndex = idx;
+            ta.focus();
+            ta.setSelectionRange(idx, idx + query.length);
+            const total = (text.match(new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'g')) || []).length;
+            status.textContent = `Tìm thấy ${total} kết quả`;
+        }
+
+        function replaceOne() {
+            const ta      = getActiveTextarea();
+            const query   = document.getElementById('findInput').value;
+            const replace = document.getElementById('replaceInput').value;
+            const status  = document.getElementById('findStatus');
+            if (!query) return;
+            const s = ta.selectionStart, e = ta.selectionEnd;
+            if (ta.value.substring(s, e) === query) {
+                ta.value = ta.value.substring(0, s) + replace + ta.value.substring(e);
+                ta.selectionStart = ta.selectionEnd = s + replace.length;
+                ta.dispatchEvent(new Event('input'));
+                status.textContent = 'Đã thay 1 kết quả.';
+                _findIndex = s + replace.length - 1;
+                findNext();
+            } else {
+                findNext();
+            }
+        }
+
+        function replaceAll() {
+            const ta      = getActiveTextarea();
+            const query   = document.getElementById('findInput').value;
+            const replace = document.getElementById('replaceInput').value;
+            const status  = document.getElementById('findStatus');
+            if (!query) return;
+            const esc   = query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+            const count = (ta.value.match(new RegExp(esc,'g')) || []).length;
+            if (count === 0) { status.textContent = 'Không tìm thấy.'; return; }
+            ta.value = ta.value.split(query).join(replace);
+            ta.dispatchEvent(new Event('input'));
+            status.textContent = `✅ Đã thay ${count} kết quả.`;
+            _findIndex = -1;
+        }
+
+        // Keyboard shortcuts: Ctrl+H → toggle F&R; Esc → đóng; Enter trong findInput → findNext
+        document.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+                e.preventDefault();
+                if (activeTab !== 'preview') toggleFindReplace();
+            }
+            if (e.key === 'Escape') {
+                const picker = document.getElementById('symbolPicker');
+                if (!picker.classList.contains('hidden')) { picker.classList.add('hidden'); return; }
+                const panel = document.getElementById('findReplacePanel');
+                if (!panel.classList.contains('hidden')) toggleFindReplace();
+            }
+            if (e.key === 'Enter' && document.activeElement?.id === 'findInput') {
+                e.preventDefault(); findNext();
+            }
+        });
+
+        // =====================================================
+        // PROMPT MODAL
+        // =====================================================
+        function openPromptModal() {
+            const modal = document.getElementById('promptModal');
+            const modalContent = document.getElementById('promptModalContent');
+            // Tự động chọn loại phù hợp với tab đang mở
+            const autoType = activeTab === 'quiz' ? 'quiz' : 'theory';
+            document.querySelectorAll('.ptype-card').forEach(c => {
+                c.classList.toggle('selected', c.dataset.type === autoType);
+            });
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modalContent.classList.remove('scale-95', 'opacity-0');
+                modalContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+            generatePromptText();
+        }
+
+        function closePromptModal() {
+            const modal = document.getElementById('promptModal');
+            const modalContent = document.getElementById('promptModalContent');
+            modalContent.classList.remove('scale-100', 'opacity-100');
+            modalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 200);
+        }
+
+        // =====================================================
+        // PROMPT MODAL — helpers
+        // =====================================================
+        function selectPType(el) {
+            document.querySelectorAll('.ptype-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            generatePromptText();
+        }
+        function selectBloom(el) {
+            document.querySelectorAll('.bloom-btn').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            generatePromptText();
+        }
+
+        // ── Cú pháp chi tiết theo từng loại slide ──────────
+        function buildSyntaxRules(ptype) {
+            let r = '';
+            r += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+            r += `🔴 TUÂN THỦ TUYỆT ĐỐI CÚ PHÁP MARKDOWN SAU\n`;
+            r += `   (KHÔNG thêm bất kỳ định dạng nào khác)\n`;
+            r += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+            if (ptype === 'quiz') {
+                r += `[CÚ PHÁP SLIDE TRẮC NGHIỆM]\n\n`;
+                r += `Mỗi câu hỏi gồm 3 phần bắt buộc theo đúng thứ tự:\n\n`;
+                r += `PHẦN 1 — Câu hỏi:\n`;
+                r += `**Câu [STT]:** [Nội dung câu hỏi đầy đủ, rõ ràng]\n\n`;
+                r += `PHẦN 2 — Bốn đáp án (mỗi đáp án một dòng):\n`;
+                r += `A. [Đáp án A]\nB. [Đáp án B]\nC. [Đáp án C]\nD. [Đáp án D]\n\n`;
+                r += `PHẦN 3 — Lời giải:\n`;
+                r += `**Lời giải chi tiết:**\n`;
+                r += `* **Chọn [chữ cái đúng].**\n`;
+                r += `* [Giải thích lý do tại sao đáp án đó đúng]\n`;
+                r += `* [Giải thích tại sao các đáp án còn lại sai (nếu cần)]\n\n`;
+                r += `KẾT THÚC MỖI CÂU:\n`;
+                r += `---\n\n`;
+                r += `VÍ DỤ ĐÚNG:\n`;
+                r += `**Câu 1:** Phương trình x² - 5x + 6 = 0 có nghiệm là?\n`;
+                r += `A. x = 1 hoặc x = 6\nB. x = 2 hoặc x = 3\nC. x = -2 hoặc x = -3\nD. x = 1 hoặc x = -6\n`;
+                r += `**Lời giải chi tiết:**\n* **Chọn B.**\n* Nhẩm nghiệm: (-2)×(-3)=6 ✓, (-2)+(-3)=-5 ✓.\n---\n\n`;
+                r += `⛔ CẤM dùng: #, ##, dấu -, hay bất kỳ ký tự nào ngoài cú pháp trên.\n`;
+                r += `⛔ CẤM viết lời dẫn "Đây là câu hỏi số..." hay giải thích ngoài cú pháp.\n`;
+                r += `✅ Chỉ xuất nội dung thuần túy, KHÔNG có lời giới thiệu hay kết bài.\n`;
+
+            } else if (ptype === 'cover') {
+                r += `[CÚ PHÁP: SLIDE BÌA + CÁC SLIDE NỘI DUNG]\n\n`;
+                r += `SLIDE BÌA (bắt buộc là slide ĐẦU TIÊN — quan trọng):\n`;
+                r += `# [Tên bài học chính thức, ngắn gọn]\n`;
+                r += `## [Phụ đề: Môn học — Lớp, hoặc câu slogan truyền cảm hứng]\n`;
+                r += `---\n\n`;
+                r += `⚠️ SLIDE BÌA: KHÔNG được có dấu "-" (gạch đầu dòng).\n`;
+                r += `   Chỉ có # và ## → ứng dụng tự nhận diện và tạo slide bìa đẹp.\n\n`;
+                r += `CÁC SLIDE NỘI DUNG (slide 2 trở đi — cú pháp chuẩn):\n`;
+                r += `# [Tiêu đề: câu khẳng định ngắn, tối đa 10 từ]\n`;
+                r += `## [Subtitle tùy chọn: ghi chú, câu hỏi dẫn dắt]\n`;
+                r += `- [Ý chính 1 — từ khóa, tối đa 12 từ]\n`;
+                r += `- [Ý chính 2 — từ khóa, tối đa 12 từ]\n`;
+                r += `- [Ý chính 3 — nếu cần, không quá 4 dấu - mỗi slide]\n`;
+                r += `---\n\n`;
+                r += `QUY TẮC VÀNG:\n`;
+                r += `✅ 1 slide = 1 ý tưởng. Tuyệt đối không nhồi nhét.\n`;
+                r += `✅ Dấu --- nằm riêng một dòng, không có gì sau nó.\n`;
+                r += `✅ Dùng bảng Markdown nếu cần so sánh: | cột | cột |\\n|---|---|\\n| data | data |\n`;
+                r += `⛔ KHÔNG dùng **bold**, _italic_, >, \`\`\`, hay ###.\n`;
+                r += `⛔ KHÔNG viết lời dẫn hoặc giải thích ngoài cú pháp slide.\n`;
+
+            } else if (ptype === 'compare') {
+                r += `[CÚ PHÁP SLIDE SO SÁNH / BẢNG ĐỐI CHIẾU]\n\n`;
+                r += `Mỗi slide dùng bảng Markdown làm trọng tâm:\n\n`;
+                r += `# [Tiêu đề nêu rõ nội dung so sánh]\n`;
+                r += `## [Kết luận / Mục đích so sánh ngắn]\n`;
+                r += `| Tiêu chí | [Đối tượng A] | [Đối tượng B] |\n`;
+                r += `|---|---|---|\n`;
+                r += `| [Tiêu chí 1] | [Giá trị A] | [Giá trị B] |\n`;
+                r += `| [Tiêu chí 2] | [Giá trị A] | [Giá trị B] |\n`;
+                r += `| [Tiêu chí 3] | [Giá trị A] | [Giá trị B] |\n`;
+                r += `- [Kết luận quan trọng rút ra từ bảng]\n`;
+                r += `---\n\n`;
+                r += `QUY TẮC BẢNG MARKDOWN:\n`;
+                r += `✅ Dòng 1: tên cột (header — sẽ in đậm trong slide)\n`;
+                r += `✅ Dòng 2: |---|---| (bắt buộc, phân cách header)\n`;
+                r += `✅ Các dòng tiếp theo: dữ liệu, không được để trống ô\n`;
+                r += `✅ Cuối slide: dấu --- trên dòng riêng biệt\n`;
+                r += `⛔ KHÔNG làm bảng quá 4 cột hoặc quá 6 hàng dữ liệu.\n`;
+
+            } else if (ptype === 'summary') {
+                r += `[CÚ PHÁP SLIDE CỦNG CỐ - TỔNG KẾT]\n\n`;
+                r += `Xen kẽ 2 loại slide:\n\n`;
+                r += `LOẠI A — Slide tóm tắt điểm then chốt:\n`;
+                r += `# Tóm tắt: [Chủ đề]\n`;
+                r += `## Những điểm cần ghi nhớ\n`;
+                r += `- [Ý quan trọng nhất — từ khóa]\n`;
+                r += `- [Ý quan trọng thứ hai]\n`;
+                r += `- [Ý quan trọng thứ ba]\n---\n\n`;
+                r += `LOẠI B — Slide bảng tổng hợp:\n`;
+                r += `# Bảng tổng hợp: [Tên nội dung]\n`;
+                r += `| Khái niệm | Công thức / Định nghĩa | Ví dụ |\n`;
+                r += `|---|---|---|\n`;
+                r += `| [Nội dung] | [Công thức] | [VD ngắn] |\n---\n\n`;
+                r += `SLIDE CUỐI — Câu hỏi ôn tập (bắt buộc):\n`;
+                r += `# Câu hỏi ôn tập\n`;
+                r += `## Hãy thử trả lời các câu sau\n`;
+                r += `- [Câu hỏi ôn tập 1]\n- [Câu hỏi ôn tập 2]\n- [Câu hỏi ôn tập 3]\n---\n\n`;
+                r += `✅ Xen kẽ loại A và B để tăng đa dạng trình bày\n`;
+                r += `⛔ Không viết lại toàn bộ lý thuyết — chỉ từ khóa và điểm then chốt\n`;
+
+            } else {
+                // theory / warmup / practice / exam — cú pháp chuẩn
+                r += `[CÚ PHÁP SLIDE CHUẨN — ÁP DỤNG CHO MỌI SLIDE]\n\n`;
+                r += `MỖI SLIDE gồm các phần theo đúng thứ tự này:\n\n`;
+                r += `DÒNG 1 — Tiêu đề (bắt buộc):\n`;
+                r += `# [Tiêu đề] — câu khẳng định hoặc tên khái niệm, KHÔNG viết "Slide X"\n\n`;
+                r += `DÒNG 2 — Subtitle (tùy chọn, có thể bỏ qua):\n`;
+                r += `## [Subtitle] — ghi chú bổ sung, câu hỏi dẫn dắt, hoặc phạm vi kiến thức\n\n`;
+                r += `DÒNG 3 trở đi — Nội dung (2–4 dòng, không nhiều hơn):\n`;
+                r += `- [Ý 1: từ khóa cốt lõi + giải thích cực ngắn, tối đa 15 từ]\n`;
+                r += `- [Ý 2: từ khóa cốt lõi + giải thích cực ngắn, tối đa 15 từ]\n`;
+                r += `- [Ý 3: nếu cần thiết]\n\n`;
+                r += `DÒNG CUỐI — Ngắt slide (bắt buộc):\n`;
+                r += `---\n\n`;
+                r += `BẢNG MARKDOWN (dùng khi cần so sánh, không bắt buộc mỗi slide):\n`;
+                r += `| Tiêu đề cột 1 | Tiêu đề cột 2 | Tiêu đề cột 3 |\n`;
+                r += `|---|---|---|\n`;
+                r += `| Dữ liệu A1 | Dữ liệu A2 | Dữ liệu A3 |\n`;
+                r += `| Dữ liệu B1 | Dữ liệu B2 | Dữ liệu B3 |\n\n`;
+                r += `VÍ DỤ ĐÚNG (không thêm gì ngoài cú pháp này):\n`;
+                r += `# Định lý Pythagore\n`;
+                r += `## Áp dụng cho tam giác vuông\n`;
+                r += `- Công thức: a² + b² = c² (c là cạnh huyền)\n`;
+                r += `- Điều kiện: góc vuông tại C\n`;
+                r += `- Ứng dụng: kiểm tra tam giác có vuông không\n`;
+                r += `---\n\n`;
+                r += `QUY TẮC VÀNG — KHÔNG ĐƯỢC VI PHẠM:\n`;
+                r += `✅ 1 slide = đúng 1 ý tưởng. Tuyệt đối không nhồi nhét quá 4 gạch đầu dòng.\n`;
+                r += `✅ Dùng từ khóa cốt lõi, không viết câu đầy đủ trong gạch đầu dòng.\n`;
+                r += `✅ Dấu --- bắt buộc ở cuối mỗi slide, nằm riêng một dòng.\n`;
+                r += `⛔ KHÔNG dùng: **bold**, _italic_, >, \`\`\`, hay heading ### trở lên.\n`;
+                r += `⛔ KHÔNG viết lời dẫn, giải thích hay chú thích ngoài cú pháp slide.\n`;
+                r += `⛔ KHÔNG thêm dòng trống thừa giữa tiêu đề và gạch đầu dòng.\n`;
+            }
+            return r;
+        }
+
+        // ── Hàm sinh prompt chính ──────────────────────────
+        function generatePromptText() {
+            const subject  = document.getElementById('pSubject').value.trim()  || 'Toán học';
+            const topic    = document.getElementById('pTopic').value.trim()    || '[Tên chủ đề/Bài học]';
+            const grade    = document.getElementById('pGrade').value;
+            const count    = parseInt(document.getElementById('pCount').value) || 6;
+            const duration = document.getElementById('pDuration').value;
+            const notes    = document.getElementById('pNotes').value.trim();
+
+            // Loại slide
+            const typeCard = document.querySelector('.ptype-card.selected');
+            const ptype    = typeCard ? typeCard.dataset.type : 'theory';
+
+            // Phương pháp sư phạm (multi-select)
+            const methods = [...document.querySelectorAll('.pmethod-check:checked')].map(el => el.dataset.method);
+
+            // Mức độ Bloom
+            const bloomEl  = document.querySelector('.bloom-btn.active');
+            const bloom    = bloomEl ? bloomEl.dataset.bloom : 'thonghieu';
+
+            // Tùy chọn bổ sung
+            const optTable     = document.getElementById('pOptTable').checked;
+            const optQuestion  = document.getElementById('pOptQuestion').checked;
+            const optTrick     = document.getElementById('pOptTrick').checked;
+            const optExample   = document.getElementById('pOptExample').checked;
+            const optCover     = document.getElementById('pOptCover').checked;
+            const optSummaryEnd= document.getElementById('pOptSummaryEnd').checked;
+
+            // ── Maps ──
+            const typeLabels = {
+                theory:  `${count} slide lý thuyết kiến thức mới`,
+                cover:   `1 slide bìa mở đầu + ${count} slide nội dung`,
+                warmup:  `${count} slide khởi động / kết nối kiến thức cũ`,
+                compare: `${count} slide so sánh / bảng đối chiếu`,
+                practice:`${count} slide luyện tập - vận dụng kiến thức`,
+                quiz:    `${count} câu hỏi trắc nghiệm 4 đáp án`,
+                exam:    `${count} slide phân loại dạng bài / luyện thi`,
+                summary: `${count} slide củng cố - tổng kết bài học`,
+            };
+            const bloomLabels = {
+                nhanBiet:  'Nhận biết — HS ghi nhớ định nghĩa, công thức, sự kiện',
+                thonghieu: 'Thông hiểu — HS giải thích, diễn đạt lại bằng ngôn ngữ của mình',
+                vandung:   'Vận dụng — HS giải bài toán, áp dụng công thức vào tình huống cụ thể',
+                phanTich:  'Phân tích — HS so sánh, phân loại, tìm ra cấu trúc ẩn',
+                danhGia:   'Đánh giá — HS nhận xét, phản biện, chứng minh tính đúng/sai',
+                sangTao:   'Sáng tạo — HS tổng hợp kiến thức, đặt câu hỏi mới, thiết kế giải pháp',
+            };
+            const methodLabels = {
+                socratic:   'Mỗi slide mở đầu bằng 1 câu hỏi Socratic (gợi mở) để kích thích tư duy HS trước khi trình bày kiến thức',
+                example:    'Mỗi kiến thức đều kèm 1 ví dụ cụ thể, liên hệ đời sống thực tế hoặc tình huống gần gũi với HS',
+                mistake:    'Chỉ ra 1–2 sai lầm phổ biến của HS đối với nội dung này và cách nhận diện/khắc phục',
+                stepbystep: 'Trình bày theo quy trình từng bước rõ ràng: Bước 1 → Bước 2 → Bước 3 (không nhảy cóc)',
+                mindmap:    'Sử dụng bảng Markdown để hệ thống hóa, tổng hợp thông tin theo dạng lưới (ít nhất 1 bảng trong toàn bộ nội dung)',
+                challenge:  'Thêm 1 câu hỏi hoặc bài toán nâng cao/mở rộng ở cuối, yêu cầu tư duy phản biện',
+            };
+
+            // ── Xây dựng prompt ──
+            let p = '';
+
+            // Persona
+            p += `Bạn là nhà giáo dục xuất sắc với 20 năm kinh nghiệm giảng dạy ${subject} `;
+            p += `và chuyên gia thiết kế bài giảng sư phạm chất lượng cao.\n\n`;
+
+            // Nhiệm vụ
+            p += `📌 NHIỆM VỤ: Soạn ${typeLabels[ptype] || `${count} slide`} `;
+            p += `cho môn **${subject}**`;
+            if (grade) p += `, dành cho **${grade}**`;
+            p += `, chủ đề: **"${topic}"**`;
+            if (duration) p += `, phù hợp thời lượng **${duration}**`;
+            p += `.\n\n`;
+
+            // Mức độ Bloom
+            p += `📊 MỨC ĐỘ NHẬN THỨC MỤC TIÊU: ${bloomLabels[bloom] || bloomLabels.thonghieu}\n\n`;
+
+            // Phương pháp sư phạm
+            if (methods.length > 0) {
+                p += `🧠 CHIẾN LƯỢC SƯ PHẠM CẦN TÍCH HỢP:\n`;
+                methods.forEach(m => { if (methodLabels[m]) p += `- ${methodLabels[m]}\n`; });
+                p += '\n';
+            }
+
+            // Tùy chọn bổ sung
+            const optList = [];
+            if (optTable)      optList.push('Bao gồm ÍT NHẤT 1 bảng Markdown (| cột | cột |\\n|---|---|) để so sánh hoặc tổng hợp kiến thức trong toàn bộ nội dung');
+            if (optQuestion)   optList.push('Kết thúc mỗi slide bằng 1 câu hỏi ngắn gợi HS suy nghĩ, in đậm, bắt đầu bằng ❓ (đặt vào dòng gạch đầu dòng cuối cùng)');
+            if (optTrick)      optList.push('Thêm ÍT NHẤT 1 slide hoặc dòng ghi nhớ bắt đầu bằng 💡 Mẹo: hoặc 💡 Tip: để giúp HS học thuộc nhanh');
+            if (optExample)    optList.push('Mỗi slide lý thuyết có 1 ví dụ cụ thể kèm theo, ưu tiên ví dụ thực tiễn đời sống hoặc tình huống quen thuộc với HS');
+            if (optCover)      optList.push('THÊM SLIDE BÌA đầu tiên: chỉ có # [Tên bài] và ## [Phụ đề/Môn/Lớp], KHÔNG có dấu - (ứng dụng sẽ tự nhận diện thành slide bìa đẹp)');
+            if (optSummaryEnd) optList.push('THÊM 1 SLIDE TỔNG KẾT ở cuối: # Tổng kết bài học\\n- [3–4 điểm then chốt cần ghi nhớ]\\n---\\nVÀ 1 SLIDE DẶN DÒ: # Dặn dò\\n- [Bài tập về nhà / Đọc trước bài mới]\\n---');
+            if (optList.length > 0) {
+                p += `⚙️ YÊU CẦU NỘI DUNG BỔ SUNG:\n`;
+                optList.forEach(o => p += `- ${o}\n`);
+                p += '\n';
+            }
+
+            // Ghi chú đặc biệt
+            if (notes) {
+                p += `📝 YÊU CẦU ĐẶC BIỆT TỪ GIÁO VIÊN: ${notes}\n\n`;
+            }
+
+            // Cú pháp bắt buộc
+            p += buildSyntaxRules(ptype);
+
+            document.getElementById('pResult').value = p.trim();
+        }
+
+        // Auto-update khi thay đổi bất kỳ trường nào
+        ['pSubject','pTopic','pGrade','pCount','pDuration','pNotes'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('input',  generatePromptText);
+                el.addEventListener('change', generatePromptText);
+            }
+        });
+        document.querySelectorAll('.pmethod-check').forEach(el => {
+            el.addEventListener('change', generatePromptText);
+        });
+        ['pOptTable','pOptQuestion','pOptTrick','pOptExample','pOptCover','pOptSummaryEnd'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('change', generatePromptText);
+        });
+
+        function copyPrompt() {
+            const promptText = document.getElementById('pResult').value;
+            if (!promptText) return;
+            navigator.clipboard.writeText(promptText).then(() => {
+                showToast("Đã copy Prompt! Hãy dán vào ChatGPT hoặc Gemini nhé.", "success");
+                closePromptModal();
+            }).catch(() => {
+                const ta = document.createElement("textarea");
+                ta.value = promptText;
+                document.body.appendChild(ta); ta.select();
+                try { document.execCommand('copy'); showToast("Đã copy Prompt!", "success"); closePromptModal(); }
+                catch (ex) { showToast("Lỗi khi copy. Vui lòng copy thủ công trong khung.", "error"); }
+                document.body.removeChild(ta);
+            });
+        }
+
+        // =====================================================
+        // TOAST
+        // =====================================================
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            container.classList.remove('hidden'); container.classList.add('flex');
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-green-600' : 'bg-red-600';
+            const icon = type === 'success'
+                ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>'
+                : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>';
+            toast.className = `${bgColor} text-white px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 toast-animate max-w-md`;
+            toast.innerHTML = `<svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">${icon}</svg><span class="font-medium">${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0'; toast.style.transform = 'translateY(100%)'; toast.style.transition = 'all 0.3s ease-out';
+                setTimeout(() => {
+                    if (container.contains(toast)) container.removeChild(toast);
+                    if (container.children.length === 0) { container.classList.add('hidden'); container.classList.remove('flex'); }
+                }, 300);
+            }, 4000);
+        }
+
+        // =====================================================
+        // SMART FONT SIZE SYSTEM
+        // =====================================================
+        // (currentFsMode and FS_PRESETS declared at top of script to avoid TDZ)
+
+        function selectFsMode(el) {
+            document.querySelectorAll('.fs-mode-btn').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            currentFsMode = el.dataset.fsmode;
+            const labels = { auto:'Tự động', large:'Lớn', medium:'Vừa', small:'Nhỏ', custom:'Tùy chỉnh' };
+            const badge = document.getElementById('fs-badge');
+            if (badge) badge.textContent = labels[currentFsMode] || '';
+            const customPanel = document.getElementById('fsCustomPanel');
+            if (customPanel) customPanel.classList.toggle('hidden', currentFsMode !== 'custom');
+            updateFsPreview();
+        }
+
+        function onFsSlidersChange() {
+            const tv = document.getElementById('titleSizeSlider').value;
+            const bv = document.getElementById('bodySizeSlider').value;
+            const sv = document.getElementById('subSizeSlider').value;
+            document.getElementById('titleSizeLabel').textContent = tv + 'pt';
+            document.getElementById('bodySizeLabel').textContent  = bv + 'pt';
+            document.getElementById('subSizeLabel').textContent   = sv + 'pt';
+            FS_PRESETS.custom.title    = parseInt(tv);
+            FS_PRESETS.custom.subtitle = parseInt(sv);
+            FS_PRESETS.custom.body     = parseInt(bv);
+            FS_PRESETS.custom.table    = Math.max(14, parseInt(bv) - 8);
+            updateFsPreview();
+        }
+
+        function updateFsPreview() {
+            const mode = currentFsMode;
+            const p    = FS_PRESETS[mode];
+            if (mode === 'auto') {
+                document.getElementById('previewTitleSize').textContent = '28–44';
+                document.getElementById('previewBodySize').textContent  = '16–30';
+                document.getElementById('previewTableSize').textContent = '14–20';
+            } else {
+                document.getElementById('previewTitleSize').textContent = p.title + 'pt';
+                document.getElementById('previewBodySize').textContent  = p.body  + 'pt';
+                document.getElementById('previewTableSize').textContent = p.table + 'pt';
+            }
+            document.getElementById('fsCapacityLabel').textContent = p.desc;
+            const maxMap = { auto:5, large:3, medium:5, small:7, custom:5 };
+            const filled = maxMap[mode] || 5;
+            const bar = document.getElementById('fsCapacityBar');
+            if (bar) {
+                bar.innerHTML = Array.from({length:9}, (_,i) =>
+                    `<div class="fs-bar-seg ${i < filled ? 'on' : ''}"></div>`
+                ).join('');
+            }
+        }
+
+        // Initialize the bar on page load (guarded — DOM may not be ready in some edge cases)
+        try { updateFsPreview(); } catch(e) { /* silent — will re-run when accordion opens */ }
+
+        // ── Core smart-sizing algorithm ────────────────────────
+        // Phân tích nội dung slide → trả về các cỡ chữ tối ưu
+        function computeSmartSizes(titleText, subtitleText, bodyBlocks, isSpaceSaving) {
+            // PPTX canvas: 10" × 7.5"  — footer 10% = 0.75"
+            const FOOTER_Y   = 6.75; // top of footer
+            const BOTTOM_PAD = 0.15;
+            const USABLE_H   = FOOTER_Y - BOTTOM_PAD;              // 6.6"
+
+            const isLongTitle = titleText.length > 45;
+            const titleY      = 0.05;                                  // sát mép trên
+            const titleSize   = 32;                                    // tiêu đề 32pt
+            const titleH      = isLongTitle   ? 0.55 : 0.38;          // 1/2 so với trước
+            const subtitleH   = subtitleText  ? 0.30 : 0;
+            const bodyStartY  = titleY + titleH + subtitleH;
+            const availH      = USABLE_H - bodyStartY;
+
+            // Separate content
+            const bullets     = bodyBlocks.filter(b => b.type === 'bullet');
+            const tables      = bodyBlocks.filter(b => b.type === 'table');
+            const longBullets = bullets.filter(b => b.text.length > 55).length;
+            const shortBullets= bullets.length - longBullets;
+            // Fixed table height
+            const tableFixedH = tables.reduce((s, t) => s + t.rows.length * 0.42 + 0.15, 0);
+            const availForBullets = Math.max(0.5, availH - tableFixedH);
+
+            if (bullets.length === 0) {
+                return {
+                    titleSize, startBodyY: bodyStartY,
+                    subtitleSize: 24,
+                    bodySize: 28, tableSize: 20, lineSpacing: 0,
+                    lineH: Math.max(0.30, 28 * 0.0210), titleY,
+                };
+            }
+
+            // Ưu tiên 28pt; chỉ giảm nếu nội dung quá nhiều
+            const fsCandidates = isSpaceSaving
+                ? [28, 26, 24, 22, 20, 18, 16]
+                : [28, 26, 24, 22, 20, 18, 16];
+
+            let chosen = { bodySize: 16, lineH: 0.34 };
+            for (const fs of fsCandidates) {
+                const lh   = Math.max(0.30, fs * 0.0210);
+                const need = shortBullets * lh + longBullets * lh * 1.5;
+                if (need <= availForBullets + 0.05) {
+                    chosen = { bodySize: fs, lineH: lh };
+                    break;
+                }
+            }
+
+            return {
+                titleSize,
+                subtitleSize: 24,
+                bodySize:    chosen.bodySize,
+                tableSize:   Math.max(14, chosen.bodySize - 8),
+                lineSpacing: 0,                                        // không gap giữa bullets
+                lineH:       chosen.lineH,                             // chiều cao 1 dòng thực
+                titleY,
+                startBodyY:  bodyStartY,
+            };
+        }
+
+        // ── Public API: called from generatePPT ───────────────
+        function getSizesForSlide(titleText, subtitleText, bodyBlocks, isSpaceSaving) {
+            const mode = currentFsMode;
+
+            if (mode === 'auto') {
+                return computeSmartSizes(titleText, subtitleText, bodyBlocks, isSpaceSaving);
+            }
+
+            // Shared geometry — titleY sát mép trên, header nhỏ gọn
+            const isLongTitle = titleText.length > 45;
+            const titleY      = 0.05;
+            const titleSize   = 28;
+            const titleH      = isLongTitle ? 0.55 : 0.38;
+            const subtitleH   = subtitleText ? 0.30 : 0;
+            const startBodyY  = titleY + titleH + subtitleH;
+
+            if (mode === 'custom') {
+                const bs = parseInt(document.getElementById('bodySizeSlider').value)  || 28;
+                const ss = parseInt(document.getElementById('subSizeSlider').value)   || 24;
+                const lh = Math.max(0.30, bs * 0.0210);
+                return {
+                    titleSize: 32,
+                    subtitleSize: ss,
+                    bodySize:    bs,
+                    tableSize:   Math.max(14, bs - 6),
+                    lineSpacing: 0,
+                    lineH:       lh,
+                    titleY, startBodyY,
+                };
+            }
+
+            // Presets: large / medium / small
+            const p = FS_PRESETS[mode];
+            const bScale = isSpaceSaving ? -2 : 0;
+            const bs = p.body + bScale;
+            return {
+                titleSize: 32,
+                subtitleSize: 24,
+                bodySize:    bs,
+                tableSize:   Math.max(14, bs - 6),
+                lineSpacing: 0,
+                lineH:       Math.max(0.30, bs * 0.0210),
+                titleY, startBodyY,
+            };
+        }
+
+        // =====================================================
+        // GENERATE PPTX
+        // =====================================================
+        async function generatePPT() {
+            const rawText = activeTab === 'quiz'
+                ? document.getElementById('quizInput').value.trim()
+                : document.getElementById('markdownInput').value.trim();
+
+            const footerText  = document.getElementById('footerInput').value.trim();
+            const footerFont  = document.getElementById('footerFont').value;
+            const selectedTheme = document.querySelector('input[name="themeMode"]:checked').value;
+            const isSpaceSaving = document.getElementById('spaceSavingMode').checked;
+            const rawFileName = document.getElementById('fileNameInput').value.trim();
+            const outputFileName = (rawFileName ? sanitizeFileName(rawFileName) : 'Bai_Giang') + '.pptx';
+            // Khi đang ở tab preview, dùng chế độ của _lastContentTab
+            const contentMode = (activeTab === 'preview') ? _lastContentTab : activeTab;
+            const rawTextFinal = contentMode === 'quiz'
+                ? document.getElementById('quizInput').value.trim()
+                : document.getElementById('markdownInput').value.trim();
+
+            if (!rawTextFinal) {
+                showToast("Vui lòng nhập nội dung Markdown trước khi tạo slide.", "error");
+                return;
+            }
+
+            const btn = document.getElementById('generateBtn');
+            const btnText = document.getElementById('btnText');
+            btn.disabled = true;
+            btn.classList.add('opacity-75', 'cursor-not-allowed');
+            btnText.innerText = "Đang kết xuất PPTX...";
+
+            try {
+                let pptx = new PptxGenJS();
+                pptx.layout = 'LAYOUT_16x9';
+
+                // Chuyển hex CSS (#RRGGBB) → hex PPTX (RRGGBB)
+                const h = (cssHex) => cssHex.replace('#','');
+                const T = THEMES[selectedTheme];
+
+                // =====================================================
+                // DEFINE SLIDE MASTER + SỐ TRANG (placeholder slidenum)
+                // =====================================================
+                pptx.defineSlideMaster({
+                    title: "MASTER_ACADEMIC",
+                    background: { color: h(T.bg) },
+                    objects: [
+                        // Thanh footer
+                        { rect: { x: 0, y: "90%", w: "100%", h: "10%", fill: { color: h(T.footerBg) } } },
+                        // Text tên tác giả (chừa 14% bên phải cho số trang)
+                        { text: { text: footerText, options: {
+                            x: 0, y: "90%", w: "86%", h: "10%",
+                            fontSize: 18, color: h(T.footerText), fontFace: footerFont,
+                            align: "center", valign: "middle"
+                        }}}
+                    ]
+                });
+
+                const slidesData = rawTextFinal.split(/^---$/m);
+                let slideNum = 0;
+
+                slidesData.forEach(slideContent => {
+                    if (slideContent.trim() === '') return;
+                    slideNum++;
+
+                    let slide = pptx.addSlide({ masterName: "MASTER_ACADEMIC" });
+
+                    // ── Số trang — in trực tiếp vào mỗi slide (góc phải footer) ──
+                    slide.addText(String(slideNum), {
+                        x: "86%", y: "90%", w: "13%", h: "10%",
+                        fontFace: "Arial", fontSize: 17,
+                        color: h(T.footerText), bold: true,
+                        align: "right", valign: "middle"
+                    });
+
+                    if (contentMode === 'quiz') {
+                        const { questionText, options, solution, isTitleOnly } = parseQuizSlide(slideContent);
+
+                        if (isTitleOnly) {
+                            slide.addText(questionText, {
+                                x: 0.5, y: 2.0, w: "90%", h: 1.5,
+                                fontFace: "Arial", fontSize: 44,
+                                color: h(T.title), bold: true, align: "center"
+                            });
+                            return;
+                        }
+
+                        let startY    = isSpaceSaving ? 0.2 : 0.4;
+                        let contentX  = isSpaceSaving ? 0.3 : 0.8;
+                        let contentW  = isSpaceSaving ? 9.4 : 8.4;
+
+                        slide.addText(questionText, {
+                            x: contentX, y: startY, w: contentW, h: 1.2,
+                            fontFace: "Arial", fontSize: isSpaceSaving ? 26 : 28,
+                            color: h(T.title), bold: true, valign: "top"
+                        });
+
+                        let optY = startY + (isSpaceSaving ? 0.9 : 1.25);
+                        let gapY = isSpaceSaving ? 0.5 : 0.58;
+
+                        options.forEach((opt, idx) => {
+                            let currentY   = optY + (idx * gapY);
+                            let badgeSize  = isSpaceSaving ? 0.4 : 0.45;
+
+                            slide.addText(opt.letter, {
+                                shape: pptx.ShapeType.ellipse,
+                                x: contentX, y: currentY, w: badgeSize, h: badgeSize,
+                                fill: { color: h(T.badgeBg) }, color: h(T.badgeText),
+                                fontFace: "Arial", fontSize: isSpaceSaving ? 20 : 22,
+                                bold: true, align: "center", valign: "middle"
+                            });
+
+                            let textOffsetX = isSpaceSaving ? 0.55 : 0.65;
+                            slide.addText(opt.text, {
+                                x: contentX + textOffsetX, y: currentY,
+                                w: contentW - textOffsetX, h: badgeSize,
+                                fontFace: "Arial", fontSize: isSpaceSaving ? 24 : 26,
+                                color: h(T.text), valign: "middle"
+                            });
+                        });
+
+                        if (solution.length > 0) {
+                            let solY = optY + (options.length * gapY) + 0.15;
+                            slide.addShape(pptx.ShapeType.rect, {
+                                x: contentX, y: solY, w: contentW, h: 1.1,
+                                fill: { color: h(T.solBg) }, line: { color: h(T.solBorder), width: 1 }
+                            });
+                            slide.addText("Lời giải chi tiết:\n" + solution.join('\n'), {
+                                x: contentX, y: solY, w: contentW, h: 1.1,
+                                fontFace: "Arial", fontSize: 20, color: h(T.solText),
+                                margin: 8, valign: "top"
+                            });
+                        }
+
+                    } else {
+                        // Basic slide
+                        const { titleText, subtitleText, bodyBullets, bodyBlocks, isCover, imageBlock } = parseBasicSlide(slideContent);
+
+                        if (isCover) {
+                            // ══ SLIDE BÌA ══
+                            const schoolText = document.getElementById('schoolInput').value.trim();
+
+                            // Thanh màu trang trí
+                            slide.addShape(pptx.ShapeType.rect, {
+                                x: "30%", y: 1.15, w: "40%", h: 0.09,
+                                fill: { color: h(T.badgeBg) }, line: { color: h(T.badgeBg) }
+                            });
+
+                            // Tiêu đề chính
+                            if (titleText) {
+                                slide.addText(titleText, {
+                                    x: "5%", y: 1.55, w: "90%", h: 1.9,
+                                    fontFace: "Arial", fontSize: 48,
+                                    color: h(T.title), bold: true,
+                                    align: "center", valign: "middle"
+                                });
+                            }
+
+                            // Đường kẻ phân cách
+                            slide.addShape(pptx.ShapeType.line, {
+                                x: "35%", y: 3.55, w: "30%", h: 0,
+                                line: { color: h(T.badgeBg), width: 1.5 }
+                            });
+
+                            // Subtitle (##)
+                            if (subtitleText) {
+                                slide.addText(subtitleText, {
+                                    x: "5%", y: 3.7, w: "90%", h: 0.65,
+                                    fontFace: "Arial", fontSize: 28,
+                                    color: h(T.text), italic: true,
+                                    align: "center", valign: "middle"
+                                });
+                            }
+
+                            // Trường / Lớp
+                            if (schoolText) {
+                                slide.addText(schoolText, {
+                                    x: "5%", y: subtitleText ? 4.45 : 4.0, w: "90%", h: 0.55,
+                                    fontFace: "Arial", fontSize: 22,
+                                    color: h(T.footerText), align: "center", valign: "middle"
+                                });
+                            }
+
+                        } else if (imageBlock) {
+                            // ══ SLIDE TÁCH ĐÔI: trái = văn bản, phải = ảnh ══
+                            // Layout: 10" × 7.5" — text 0.3→5.1" (w=4.8), ảnh 5.4→9.7" (w=4.3)
+                            const TX = 0.3, TW = 4.8;      // cột văn bản
+                            const IX = 5.4, IW = 4.3;      // cột ảnh
+                            const IY = 0.25, IH = 6.3;     // vùng ảnh (gần full chiều cao)
+
+                            // Đường phân cách dọc
+                            slide.addShape(pptx.ShapeType.line, {
+                                x: 5.2, y: 0.15, w: 0, h: 6.85,
+                                line: { color: h(T.badgeBg), width: 1.2 }
+                            });
+
+                            // Tiêu đề (full-width phía trên cả 2 cột)
+                            if (titleText) {
+                                slide.addText(titleText, {
+                                    x: TX, y: 0.05, w: 9.4, h: 0.38,
+                                    fontFace: 'Arial', fontSize: 32,
+                                    color: h(T.title), bold: true, valign: 'top',
+                                    paraSpaceBefore: 0, paraSpaceAfter: 0,
+                                });
+                            }
+
+                            // Subtitle
+                            let textStartY = titleText ? 0.48 : 0.15;
+                            if (subtitleText) {
+                                slide.addText(subtitleText, {
+                                    x: TX, y: textStartY, w: TW, h: 0.50,
+                                    fontFace: 'Arial', fontSize: 22,
+                                    color: h(T.text), italic: true, valign: 'top',
+                                    paraSpaceBefore: 0, paraSpaceAfter: 0,
+                                });
+                                textStartY += 0.50;
+                            }
+
+                            // Bullets trong cột trái
+                            const splitLineH = Math.max(0.30, 28 * 0.0210);
+                            bodyBlocks.forEach(block => {
+                                if (block.type === 'bullet') {
+                                    const lc = block.text.length > 60 ? 2 : 1;
+                                    const bh = lc * splitLineH;
+                                    slide.addText(block.text, {
+                                        x: TX, y: textStartY, w: TW, h: bh,
+                                        fontFace: 'Arial', fontSize: 28,
+                                        color: h(T.text),
+                                        bullet: { type: 'bullet' }, valign: 'top',
+                                        paraSpaceBefore: 0, paraSpaceAfter: 0,
+                                    });
+                                    textStartY += bh;
+                                } else if (block.type === 'table' && block.rows.length > 0) {
+                                    const colCount = block.rows[0].length || 1;
+                                    const colW = TW / colCount;
+                                    const rowH = 0.38;
+                                    const pptxRows = block.rows.map((row, ri) =>
+                                        Array.from({length: colCount}, (_,ci) => ({
+                                            text: row[ci] || '',
+                                            options: {
+                                                bold: ri === 0,
+                                                fill: { color: ri === 0 ? h(T.badgeBg) : h(T.bg) },
+                                                color: ri === 0 ? h(T.badgeText) : h(T.text),
+                                                fontFace: 'Arial', fontSize: 16,
+                                                align: 'center', valign: 'middle', margin: 4,
+                                            }
+                                        }))
+                                    );
+                                    slide.addTable(pptxRows, {
+                                        x: TX, y: textStartY,
+                                        colW: Array(colCount).fill(colW),
+                                        rowH: Array(block.rows.length).fill(rowH),
+                                        border: { type: 'solid', color: h(T.footerBg), pt: 0.5 },
+                                    });
+                                    textStartY += block.rows.length * rowH + 0.15;
+                                }
+                            });
+
+                            // Cột phải: ảnh hoặc placeholder
+                            if (imageBlock.url && imageBlock.url.startsWith('data:')) {
+                                // Ảnh thực — nhúng data URL
+                                slide.addImage({
+                                    data: imageBlock.url,
+                                    x: IX, y: IY, w: IW, h: IH,
+                                    sizing: { type: 'contain', w: IW, h: IH },
+                                });
+                            } else if (imageBlock.url && imageBlock.url.startsWith('http')) {
+                                // URL từ xa
+                                slide.addImage({
+                                    path: imageBlock.url,
+                                    x: IX, y: IY, w: IW, h: IH,
+                                    sizing: { type: 'contain', w: IW, h: IH },
+                                });
+                            } else {
+                                // Placeholder khi không có ảnh
+                                slide.addShape(pptx.ShapeType.rect, {
+                                    x: IX, y: IY, w: IW, h: IH,
+                                    fill: { color: h(T.footerBg) },
+                                    line: { color: h(T.badgeBg), width: 1.5, dashType: 'dash' },
+                                });
+                                slide.addText('🖼️\nChèn ảnh', {
+                                    x: IX, y: IY + IH/2 - 0.5, w: IW, h: 1.0,
+                                    fontFace: 'Arial', fontSize: 22,
+                                    color: h(T.footerText), align: 'center', valign: 'middle',
+                                });
+                            }
+
+                        } else {
+                            // ── Slide thông thường — Smart Font Sizing ──
+                            const isLongTitle = titleText.length > 45;
+                            const sz = getSizesForSlide(titleText, subtitleText, bodyBlocks, isSpaceSaving);
+
+                            const contentX = isSpaceSaving ? 0.3  : 0.5;
+                            const tableW   = isSpaceSaving ? 9.4  : 9.0;
+                            const contentW = isSpaceSaving ? 9.4  : 9.0;
+                            const titleH   = isLongTitle   ? 0.55 : 0.38;  // nhỏ gọn 1/2
+
+                            let startY = sz.startBodyY;
+
+                            if (titleText) {
+                                slide.addText(titleText, {
+                                    x: contentX, y: sz.titleY, w: contentW, h: titleH,
+                                    fontFace: "Arial", fontSize: sz.titleSize,
+                                    color: h(T.title), bold: true, valign: "top",
+                                    paraSpaceBefore: 0, paraSpaceAfter: 0,
+                                });
+                            }
+
+                            if (subtitleText) {
+                                const subY = sz.titleY + titleH;      // sát ngay dưới tiêu đề
+                                slide.addText(subtitleText, {
+                                    x: contentX, y: subY, w: contentW, h: 0.55,
+                                    fontFace: "Arial", fontSize: sz.subtitleSize,
+                                    color: h(T.text), italic: true, valign: "top",
+                                    paraSpaceBefore: 0, paraSpaceAfter: 0,
+                                });
+                                startY = subY + 0.55;
+                            }
+
+                            // Render bodyBlocks: bullets + tables
+                            // lineH = chiều cao 1 dòng, lineSpacing = 0 (không gap thêm)
+                            const lineH = sz.lineH || Math.max(0.30, sz.bodySize * 0.0210);
+                            bodyBlocks.forEach(block => {
+                                if (block.type === 'bullet') {
+                                    // Estimate wrap
+                                    const charLen      = block.text.length;
+                                    const isLongBullet = charLen > 60;
+                                    const isVeryLong   = charLen > 100;
+                                    const lineCount    = isVeryLong ? 3 : isLongBullet ? 2 : 1;
+                                    const currentH     = lineCount * lineH;
+                                    slide.addText(block.text, {
+                                        x: contentX, y: startY, w: contentW, h: currentH,
+                                        fontFace: "Arial", fontSize: sz.bodySize,
+                                        color: h(T.text),
+                                        paraSpaceBefore: 0, paraSpaceAfter: 0,
+                                        bullet: { type: 'bullet' }, valign: "top"
+                                    });
+                                    startY += currentH;                // tight: đúng bằng chiều cao box
+
+                                } else if (block.type === 'table' && block.rows.length > 0) {
+                                    const colCount = block.rows[0].length || 1;
+                                    const colW     = tableW / colCount;
+                                    // rowH scales with tableSize
+                                    const rowH     = Math.max(0.36, sz.tableSize * 0.018);
+
+                                    const pptxRows = block.rows.map((row, ri) =>
+                                        Array.from({length: colCount}, (_,ci) => ({
+                                            text: row[ci] || '',
+                                            options: {
+                                                bold:     ri === 0,
+                                                fill:     { color: ri === 0 ? h(T.badgeBg) : (ri%2===0 ? h(T.bg) : h(T.footerBg)) },
+                                                color:    ri === 0 ? h(T.badgeText) : h(T.text),
+                                                fontFace: 'Arial',
+                                                fontSize: sz.tableSize,
+                                                align: 'center', valign: 'middle', margin: 5,
+                                            }
+                                        }))
+                                    );
+
+                                    slide.addTable(pptxRows, {
+                                        x: contentX, y: startY,
+                                        colW: Array(colCount).fill(colW),
+                                        rowH: Array(block.rows.length).fill(rowH),
+                                        border: { type: 'solid', color: h(T.footerBg), pt: 0.5 },
+                                    });
+                                    startY += block.rows.length * rowH + 0.22;
+                                }
+                            });
+                        }
+                    }
+                });
+
+                await pptx.writeFile({ fileName: outputFileName });
+                showToast(`File "${outputFileName}" đã được tạo và tải xuống thành công!`, "success");
+
+            } catch (error) {
+                console.error("Lỗi tạo Slide:", error);
+                const msg = (error && error.message) ? error.message : String(error);
+                showToast("Lỗi: " + msg.slice(0, 120), "error");
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                btnText.innerText = "Tạo & Tải xuống .PPTX";
+            }
+        }
+    </script>
+</body>
+</html>
